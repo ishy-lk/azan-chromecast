@@ -12,7 +12,7 @@ from prayer_times_calculator import PrayerTimesCalculator
 
 # --- CONFIGURATION ---
 SPEAKER_NAMES = ["Living Room Display", "Red Room Mini"]  # Add your second device name here
-LOCAL_IP = "192.168.1.221" 
+LOCAL_IP = "192.168.1.221"
 PORT = 8000
 FAJR_FILE = "fajr_azan.mp3"
 STANDARD_FILE = "standard_azan.mp3"
@@ -25,8 +25,32 @@ LON = -0.181703
 LOCATION = "Stevenage"
 
 # Volume settings (0.0 to 1.0)
-FAJR_VOLUME = 0.4  # 40% for early morning
-STANDARD_VOLUME = 0.7  # 70% for other prayers
+FAJR_VOLUME = 0.2  # 20% for early morning
+STANDARD_VOLUME = 0.5  # 50% for other prayers
+
+# --- TERMINAL COLORS ---
+class Colors:
+    GREEN  = '\033[92m'
+    BLUE   = '\033[94m'
+    CYAN   = '\033[96m'
+    YELLOW = '\033[93m'
+    RED    = '\033[91m'
+    BOLD   = '\033[1m'
+    END    = '\033[0m'
+
+def get_device_color(device_name):
+    """Return the appropriate color for a device name"""
+    if 'Red Room' in device_name:
+        return Colors.RED
+    elif 'Living Room' in device_name:
+        return Colors.YELLOW
+    else:
+        return Colors.CYAN  # Default color for other devices
+
+def colorize_device_name(device_name):
+    """Return the device name with its unique color"""
+    color = get_device_color(device_name)
+    return f"{color}{device_name}{Colors.END}"
 
 # 1. Background Web Server
 def start_server():
@@ -34,11 +58,11 @@ def start_server():
     socketserver.TCPServer.allow_reuse_address = True
     try:
         with socketserver.TCPServer(("", PORT), handler) as httpd:
-            print(f"HTTP server started on port {PORT}")
+            print(f"{Colors.GREEN}🌐 HTTP server started on port {PORT}{Colors.END}")
             httpd.serve_forever()
     except OSError as e:
-        print(f"Warning: Could not start HTTP server on port {PORT}: {e}")
-        print("If the server is already running, this is fine. Otherwise, check the port.")
+        print(f"{Colors.YELLOW}⚠️  Warning: Could not start HTTP server on port {PORT}: {e}{Colors.END}")
+        print(f"{Colors.YELLOW}   If the server is already running, this is fine. Otherwise, check the port.{Colors.END}")
 
 threading.Thread(target=start_server, daemon=True).start()
 time.sleep(1)  # Give server time to start
@@ -49,28 +73,28 @@ def generate_monthly_csv(year, month):
     if os.path.exists(filename):
         return filename
 
-    print(f"Generating local schedule for {calendar.month_name[month]} {year}...")
+    print(f"{Colors.BLUE}📅 Generating local schedule for {calendar.month_name[month]} {year}...{Colors.END}")
     days_in_month = calendar.monthrange(year, month)[1]
-    
+
     with open(filename, mode='w', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(["Date", "Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"])
-        
+
         for day in range(1, days_in_month + 1):
             date_str = f"{year}-{month:02d}-{day:02d}"
             try:
-                calc = PrayerTimesCalculator(latitude=LAT, longitude=LON, 
+                calc = PrayerTimesCalculator(latitude=LAT, longitude=LON,
                                              calculation_method='mwl', date=date_str)
                 p = calc.fetch_prayer_times()
                 writer.writerow([f"{day:02d}/{month:02d}/{year}", p['Fajr'], p['Dhuhr'], p['Asr'], p['Maghrib'], p['Isha']])
-                print(f"Fetched times for {day:02d}/{month:02d}/{year}")
-                
+                print(f"{Colors.CYAN}  ✓ Fetched times for {day:02d}/{month:02d}/{year}{Colors.END}")
+
                 # --- ADD THIS LINE ---
                 time.sleep(1) # Wait 1 second between days to avoid API errors
                 # ---------------------
-                
+
             except Exception as e:
-                print(f"Error fetching day {day}: {e}")
+                print(f"{Colors.RED}  ✗ Error fetching day {day}: {e}{Colors.END}")
                 # Optional: continue to next day or retry
     return filename
 
@@ -78,10 +102,13 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None):
     try:
         chromecasts, browser = pychromecast.get_listed_chromecasts(friendly_names=SPEAKER_NAMES)
         if not chromecasts:
-            print(f"No devices found from list: {SPEAKER_NAMES}")
+            print(f"{Colors.RED}❌ No devices found from list: {SPEAKER_NAMES}{Colors.END}")
             return
 
-        print(f"Found {len(chromecasts)} device(s): {[cast.name for cast in chromecasts]}")
+        device_list = [colorize_device_name(cast.name) for cast in chromecasts]
+        print(f"{Colors.GREEN}✅ Found {len(chromecasts)} device(s):{Colors.END}")
+        for device_info in device_list:
+            print(f"   {device_info}")
 
         # Set volume based on prayer type
         volume = FAJR_VOLUME if is_fajr else STANDARD_VOLUME
@@ -91,7 +118,7 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None):
             if prayer_name:
                 title_text = f"{prayer_name} Prayer"
                 artist_text = f"It's time for {prayer_name} in {LOCATION}"
-                print(f"Playing {prayer_name} Azan (test)")
+                print(f"{Colors.BOLD}{Colors.BLUE}🎵 Playing {prayer_name} Azan (test){Colors.END}")
             else:
                 title_text = "Test Azan"
                 artist_text = f"{LOCATION} Prayer Time"
@@ -100,13 +127,13 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None):
             # Fallback to standard file if Fajr file doesn't exist
             if not os.path.exists(file):
                 if is_fajr:
-                    print(f"Note: {FAJR_FILE} not found, using {STANDARD_FILE}")
+                    print(f"{Colors.YELLOW}⚠️  Note: {FAJR_FILE} not found, using {STANDARD_FILE}{Colors.END}")
                 file = STANDARD_FILE
 
             if prayer_name:
                 title_text = f"{prayer_name} Prayer"
                 artist_text = f"It's time for {prayer_name} in {LOCATION}"
-                print(f"Playing {prayer_name} Azan")
+                print(f"{Colors.BOLD}{Colors.BLUE}🕌 Playing {prayer_name} Azan{Colors.END}")
             else:
                 title_text = "Fajr Azan" if is_fajr else "Prayer Azan"
                 artist_text = f"{LOCATION} Prayer Time"
@@ -119,10 +146,11 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None):
         for cast in chromecasts:
             try:
                 cast.wait()
-                print(f"Device: {cast.name}, Type: {cast.cast_type}, Model: {cast.model_name}")
+                colored_name = colorize_device_name(cast.name)
+                print(f"{Colors.CYAN}📱 Device: {colored_name}, Type: {cast.cast_type}, Model: {cast.model_name}{Colors.END}")
 
                 cast.set_volume(volume)
-                print(f"Volume set to {int(volume * 100)}% on {cast.name}")
+                print(f"{Colors.GREEN}🔊 Volume set to {int(volume * 100)}% on {colored_name}{Colors.END}")
 
                 # Check if device supports images (has a display)
                 is_audio_only = 'audio' in cast.model_name.lower() or 'mini' in cast.model_name.lower()
@@ -138,7 +166,7 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None):
                         'artist': artist_text,
                         'albumName': 'Daily Prayers'
                     }
-                    print(f"Using audio-only metadata for {cast.name}")
+                    print(f"{Colors.CYAN}🎧 Using audio-only metadata for {colored_name}{Colors.END}")
                 else:
                     # Full metadata with images for display-capable devices
                     metadata = {
@@ -164,10 +192,11 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None):
                     metadata=metadata
                 )
                 mc.block_until_active()
-                print(f"Started playing {title_text} on {cast.name}")
+                print(f"{Colors.GREEN}✅ Started playing {title_text} on {colored_name}{Colors.END}")
                 media_controllers.append((mc, cast.name))
             except Exception as e:
-                print(f"Error playing on {cast.name}: {e}")
+                colored_name_err = colorize_device_name(cast.name)
+                print(f"{Colors.RED}❌ Error playing on {colored_name_err}: {e}{Colors.END}")
                 import traceback
                 traceback.print_exc()
 
@@ -180,19 +209,19 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None):
             while first_mc.status.player_state in ['PLAYING', 'BUFFERING']:
                 time.sleep(1)
                 first_mc.update_status()
-            print(f"Finished playing {title_text}")
+            print(f"{Colors.GREEN}✅ Finished playing {title_text}{Colors.END}")
 
     except Exception as e:
-        print(f"Cast Error: {e}")
+        print(f"{Colors.RED}❌ Cast Error: {e}{Colors.END}")
 
 # 3. Main Loop
-print(f"Azan System Active for Stevenage coordinates.")
+print(f"{Colors.BOLD}{Colors.GREEN}🕌 Azan System Active for {LOCATION} coordinates{Colors.END}")
 
 # Check for test mode
 if '--test' in sys.argv:
-    print("Running in test mode...")
+    print(f"{Colors.BLUE}🧪 Running in test mode...{Colors.END}")
     play_azan(is_fajr=False, test_mode=True)
-    print("Test completed. Exiting.")
+    print(f"{Colors.GREEN}✅ Test completed. Exiting.{Colors.END}")
     sys.exit(0)
 
 # Check for test prayer mode
@@ -203,10 +232,10 @@ if '--test-prayer' in sys.argv:
     except (ValueError, IndexError):
         prayer_name = "Maghrib"
 
-    print(f"Running test with {prayer_name} prayer display...")
+    print(f"{Colors.BLUE}🧪 Running test with {prayer_name} prayer display...{Colors.END}")
     is_fajr = prayer_name.lower() == 'fajr'
     play_azan(is_fajr=is_fajr, test_mode=True, prayer_name=prayer_name)
-    print("Test completed. Exiting.")
+    print(f"{Colors.GREEN}✅ Test completed. Exiting.{Colors.END}")
     sys.exit(0)
 
 # Normal scheduling mode
@@ -222,7 +251,7 @@ while True:
             if row['Date'] == today_str:
                 for prayer in ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha']:
                     if now_time == row[prayer]:
-                        print(f"It is time for {prayer} ({now_time})")
+                        print(f"{Colors.BOLD}{Colors.BLUE}🕌 It is time for {prayer} ({now_time}){Colors.END}")
                         play_azan(is_fajr=(prayer == 'Fajr'), prayer_name=prayer)
                         time.sleep(61)
 
