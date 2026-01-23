@@ -11,6 +11,13 @@ import socket
 from datetime import datetime
 from prayer_times_calculator import PrayerTimesCalculator
 
+# Force unbuffered output for logging
+sys.stdout.reconfigure(line_buffering=True) if hasattr(sys.stdout, 'reconfigure') else None
+
+def log(message):
+    """Print with explicit flush for immediate logging"""
+    print(message, flush=True)
+
 def get_local_ip():
     """Auto-detect the local IP address"""
     try:
@@ -113,15 +120,18 @@ def generate_monthly_csv(year, month):
 
 def play_azan(is_fajr, test_mode=False, prayer_name=None):
     try:
+        log(f"\n{Colors.BOLD}{'='*60}{Colors.END}")
+        log(f"{Colors.CYAN}Starting playback request at {datetime.now().strftime('%H:%M:%S')}{Colors.END}")
+
         chromecasts, browser = pychromecast.get_listed_chromecasts(friendly_names=SPEAKER_NAMES)
         if not chromecasts:
-            print(f"{Colors.RED}❌ No devices found from list: {SPEAKER_NAMES}{Colors.END}")
+            log(f"{Colors.RED}❌ No devices found from list: {SPEAKER_NAMES}{Colors.END}")
             return
 
         device_list = [colorize_device_name(cast.name) for cast in chromecasts]
-        print(f"{Colors.GREEN}✅ Found {len(chromecasts)} device(s):{Colors.END}")
+        log(f"{Colors.GREEN}✅ Found {len(chromecasts)} device(s):{Colors.END}")
         for device_info in device_list:
-            print(f"   {device_info}")
+            log(f"   {device_info}")
 
         # Set volume based on prayer type
         volume = FAJR_VOLUME if is_fajr else STANDARD_VOLUME
@@ -131,7 +141,7 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None):
             if prayer_name:
                 title_text = f"{prayer_name} Prayer"
                 artist_text = f"It's time for {prayer_name} in {LOCATION}"
-                print(f"{Colors.BOLD}{Colors.BLUE}🎵 Playing {prayer_name} Azan (test){Colors.END}")
+                log(f"{Colors.BOLD}{Colors.BLUE}🎵 Playing {prayer_name} Azan (test){Colors.END}")
             else:
                 title_text = "Test Azan"
                 artist_text = f"{LOCATION} Prayer Time"
@@ -140,13 +150,13 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None):
             # Fallback to standard file if Fajr file doesn't exist
             if not os.path.exists(file):
                 if is_fajr:
-                    print(f"{Colors.YELLOW}⚠️  Note: {FAJR_FILE} not found, using {STANDARD_FILE}{Colors.END}")
+                    log(f"{Colors.YELLOW}⚠️  Note: {FAJR_FILE} not found, using {STANDARD_FILE}{Colors.END}")
                 file = STANDARD_FILE
 
             if prayer_name:
                 title_text = f"{prayer_name} Prayer"
                 artist_text = f"It's time for {prayer_name} in {LOCATION}"
-                print(f"{Colors.BOLD}{Colors.BLUE}🕌 Playing {prayer_name} Azan{Colors.END}")
+                log(f"{Colors.BOLD}{Colors.BLUE}🕌 Playing {prayer_name} Azan{Colors.END}")
             else:
                 title_text = "Fajr Azan" if is_fajr else "Prayer Azan"
                 artist_text = f"{LOCATION} Prayer Time"
@@ -156,14 +166,16 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None):
 
         # Play on all devices simultaneously
         media_controllers = []
+        log(f"\n{Colors.BOLD}Attempting to play on {len(chromecasts)} device(s)...{Colors.END}\n")
+
         for cast in chromecasts:
             try:
                 cast.wait()
                 colored_name = colorize_device_name(cast.name)
-                print(f"{Colors.CYAN}📱 Device: {colored_name}, Type: {cast.cast_type}, Model: {cast.model_name}{Colors.END}")
+                log(f"{Colors.CYAN}📱 Device: {colored_name}, Type: {cast.cast_type}, Model: {cast.model_name}{Colors.END}")
 
                 cast.set_volume(volume)
-                print(f"{Colors.GREEN}🔊 Volume set to {int(volume * 100)}% on {colored_name}{Colors.END}")
+                log(f"{Colors.GREEN}🔊 Volume set to {int(volume * 100)}% on {colored_name}{Colors.END}")
 
                 # Check if device supports images (has a display)
                 is_audio_only = 'audio' in cast.model_name.lower() or 'mini' in cast.model_name.lower()
@@ -179,7 +191,7 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None):
                         'artist': artist_text,
                         'albumName': 'Daily Prayers'
                     }
-                    print(f"{Colors.CYAN}🎧 Using audio-only metadata for {colored_name}{Colors.END}")
+                    log(f"{Colors.CYAN}🎧 Using audio-only metadata for {colored_name}{Colors.END}")
                 else:
                     # Full metadata with images for display-capable devices
                     metadata = {
@@ -194,6 +206,7 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None):
                         ]
                     }
 
+                log(f"{Colors.YELLOW}🎬 Sending play command to {colored_name}...{Colors.END}")
                 mc.play_media(
                     url,
                     'audio/mp3',
@@ -205,13 +218,16 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None):
                     metadata=metadata
                 )
                 mc.block_until_active()
-                print(f"{Colors.GREEN}✅ Started playing {title_text} on {colored_name}{Colors.END}")
+                log(f"{Colors.GREEN}✅ Started playing {title_text} on {colored_name}{Colors.END}")
                 media_controllers.append((mc, cast.name))
             except Exception as e:
                 colored_name_err = colorize_device_name(cast.name)
-                print(f"{Colors.RED}❌ Error playing on {colored_name_err}: {e}{Colors.END}")
+                log(f"{Colors.RED}❌ Error playing on {colored_name_err}: {e}{Colors.END}")
                 import traceback
                 traceback.print_exc()
+
+        log(f"\n{Colors.GREEN}✅ Playback initiated on {len(media_controllers)} device(s){Colors.END}")
+        log(f"{Colors.BOLD}{'='*60}{Colors.END}\n")
 
         # Wait for playback to complete in test mode
         if test_mode and media_controllers:
@@ -222,10 +238,10 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None):
             while first_mc.status.player_state in ['PLAYING', 'BUFFERING']:
                 time.sleep(1)
                 first_mc.update_status()
-            print(f"{Colors.GREEN}✅ Finished playing {title_text}{Colors.END}")
+            log(f"{Colors.GREEN}✅ Finished playing {title_text}{Colors.END}")
 
     except Exception as e:
-        print(f"{Colors.RED}❌ Cast Error: {e}{Colors.END}")
+        log(f"{Colors.RED}❌ Cast Error: {e}{Colors.END}")
 
 # 3. Main Loop
 print(f"{Colors.BOLD}{Colors.GREEN}🕌 Azan System Active for {LOCATION} coordinates{Colors.END}")
@@ -265,7 +281,7 @@ while True:
             if row['Date'] == today_str:
                 for prayer in ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha']:
                     if now_time == row[prayer]:
-                        print(f"{Colors.BOLD}{Colors.BLUE}🕌 It is time for {prayer} ({now_time}){Colors.END}")
+                        log(f"{Colors.BOLD}{Colors.BLUE}🕌 It is time for {prayer} ({now_time}){Colors.END}")
                         play_azan(is_fajr=(prayer == 'Fajr'), prayer_name=prayer)
                         time.sleep(61)
 
