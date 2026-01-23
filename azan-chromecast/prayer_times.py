@@ -99,6 +99,12 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None):
                 artist_text = f"{LOCATION} Prayer Time"
         else:
             file = FAJR_FILE if is_fajr else STANDARD_FILE
+            # Fallback to standard file if Fajr file doesn't exist
+            if not os.path.exists(file):
+                if is_fajr:
+                    print(f"Note: {FAJR_FILE} not found, using {STANDARD_FILE}")
+                file = STANDARD_FILE
+
             if prayer_name:
                 title_text = f"{prayer_name} Prayer"
                 artist_text = f"It's time for {prayer_name} in {LOCATION}"
