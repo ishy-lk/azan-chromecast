@@ -11,7 +11,7 @@ from datetime import datetime
 from prayer_times_calculator import PrayerTimesCalculator
 
 # --- CONFIGURATION ---
-SPEAKER_NAME = "Living Room Display"
+SPEAKER_NAMES = ["Living Room Display", "Red Room Mini"]  # Add your second device name here
 LOCAL_IP = "192.168.1.221" 
 PORT = 8000
 FAJR_FILE = "fajr_azan.mp3"
@@ -76,17 +76,15 @@ def generate_monthly_csv(year, month):
 
 def play_azan(is_fajr, test_mode=False, prayer_name=None):
     try:
-        chromecasts, browser = pychromecast.get_listed_chromecasts(friendly_names=[SPEAKER_NAME])
+        chromecasts, browser = pychromecast.get_listed_chromecasts(friendly_names=SPEAKER_NAMES)
         if not chromecasts:
-            print(f"Device {SPEAKER_NAME} not found.")
+            print(f"No devices found from list: {SPEAKER_NAMES}")
             return
-        cast = chromecasts[0]
-        cast.wait()
+
+        print(f"Found {len(chromecasts)} device(s): {[cast.name for cast in chromecasts]}")
 
         # Set volume based on prayer type
         volume = FAJR_VOLUME if is_fajr else STANDARD_VOLUME
-        cast.set_volume(volume)
-        print(f"Volume set to {int(volume * 100)}%")
 
         if test_mode:
             file = TEST_FILE
@@ -116,37 +114,50 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None):
         url = f"http://{LOCAL_IP}:{PORT}/{file}"
         thumb_url = f"http://{LOCAL_IP}:{PORT}/{BG_IMAGE}"
 
-        mc = cast.media_controller
-        mc.play_media(
-            url,
-            'audio/mp3',
-            title=title_text,
-            thumb=thumb_url,
-            current_time=0,
-            autoplay=True,
-            stream_type='BUFFERED',
-            metadata={
-                'metadataType': 3,
-                'title': title_text,
-                'artist': artist_text,
-                'albumName': 'Daily Prayers',
-                'images': [
-                    {
-                        'url': thumb_url
+        # Play on all devices simultaneously
+        media_controllers = []
+        for cast in chromecasts:
+            try:
+                cast.wait()
+                cast.set_volume(volume)
+                print(f"Volume set to {int(volume * 100)}% on {cast.name}")
+
+                mc = cast.media_controller
+                mc.play_media(
+                    url,
+                    'audio/mp3',
+                    title=title_text,
+                    thumb=thumb_url,
+                    current_time=0,
+                    autoplay=True,
+                    stream_type='BUFFERED',
+                    metadata={
+                        'metadataType': 3,
+                        'title': title_text,
+                        'artist': artist_text,
+                        'albumName': 'Daily Prayers',
+                        'images': [
+                            {
+                                'url': thumb_url
+                            }
+                        ]
                     }
-                ]
-            }
-        )
-        mc.block_until_active()
-        print(f"Started playing {title_text} on {SPEAKER_NAME}")
+                )
+                mc.block_until_active()
+                print(f"Started playing {title_text} on {cast.name}")
+                media_controllers.append((mc, cast.name))
+            except Exception as e:
+                print(f"Error playing on {cast.name}: {e}")
 
         # Wait for playback to complete in test mode
-        if test_mode:
+        if test_mode and media_controllers:
             time.sleep(2)  # Give playback time to start
-            mc.update_status()
-            while mc.status.player_state in ['PLAYING', 'BUFFERING']:
+            # Monitor the first device for completion
+            first_mc = media_controllers[0][0]
+            first_mc.update_status()
+            while first_mc.status.player_state in ['PLAYING', 'BUFFERING']:
                 time.sleep(1)
-                mc.update_status()
+                first_mc.update_status()
             print(f"Finished playing {title_text}")
 
     except Exception as e:
