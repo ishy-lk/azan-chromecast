@@ -7,12 +7,25 @@ import http.server
 import socketserver
 import pychromecast
 import calendar
+import socket
 from datetime import datetime
 from prayer_times_calculator import PrayerTimesCalculator
 
+def get_local_ip():
+    """Auto-detect the local IP address"""
+    try:
+        # Create a socket connection to determine local IP
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))  # Google DNS, doesn't actually send data
+        local_ip = s.getsockname()[0]
+        s.close()
+        return local_ip
+    except Exception:
+        return "127.0.0.1"  # Fallback to localhost
+
 # --- CONFIGURATION ---
 SPEAKER_NAMES = ["Living Room Display", "Red Room Mini"]  # Add your second device name here
-LOCAL_IP = "192.168.1.221"
+LOCAL_IP = get_local_ip()  # Auto-detect local IP
 PORT = 8000
 FAJR_FILE = "fajr_azan.mp3"
 STANDARD_FILE = "standard_azan.mp3"
@@ -216,6 +229,7 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None):
 
 # 3. Main Loop
 print(f"{Colors.BOLD}{Colors.GREEN}🕌 Azan System Active for {LOCATION} coordinates{Colors.END}")
+print(f"{Colors.CYAN}📡 Using IP address: {LOCAL_IP}:{PORT}{Colors.END}")
 
 # Check for test mode
 if '--test' in sys.argv:
