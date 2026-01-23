@@ -164,6 +164,9 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None):
         url = f"http://{LOCAL_IP}:{PORT}/{file}"
         thumb_url = f"http://{LOCAL_IP}:{PORT}/{BG_IMAGE}"
 
+        log(f"{Colors.CYAN}📡 Audio URL: {url}{Colors.END}")
+        log(f"{Colors.CYAN}🖼️  Image URL: {thumb_url}{Colors.END}")
+
         # Play on all devices simultaneously
         media_controllers = []
         log(f"\n{Colors.BOLD}Attempting to play on {len(chromecasts)} device(s)...{Colors.END}\n")
@@ -174,13 +177,19 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None):
                 colored_name = colorize_device_name(cast.name)
                 log(f"{Colors.CYAN}📱 Device: {colored_name}, Type: {cast.cast_type}, Model: {cast.model_name}{Colors.END}")
 
+                # Stop any existing playback first
+                mc = cast.media_controller
+                mc.update_status()
+                if mc.status.player_state in ['PLAYING', 'BUFFERING', 'PAUSED']:
+                    log(f"{Colors.YELLOW}⏹️  Stopping existing playback on {colored_name}...{Colors.END}")
+                    mc.stop()
+                    time.sleep(0.3)
+
                 cast.set_volume(volume)
                 log(f"{Colors.GREEN}🔊 Volume set to {int(volume * 100)}% on {colored_name}{Colors.END}")
 
                 # Check if device supports images (has a display)
                 is_audio_only = 'audio' in cast.model_name.lower() or 'mini' in cast.model_name.lower()
-
-                mc = cast.media_controller
 
                 # Build metadata based on device capabilities
                 if is_audio_only:
@@ -220,6 +229,9 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None):
                 mc.block_until_active()
                 log(f"{Colors.GREEN}✅ Started playing {title_text} on {colored_name}{Colors.END}")
                 media_controllers.append((mc, cast.name))
+
+                # Small delay between devices to avoid conflicts
+                time.sleep(0.5)
             except Exception as e:
                 colored_name_err = colorize_device_name(cast.name)
                 log(f"{Colors.RED}❌ Error playing on {colored_name_err}: {e}{Colors.END}")
