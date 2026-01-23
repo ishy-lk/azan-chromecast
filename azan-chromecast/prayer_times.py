@@ -119,19 +119,29 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None):
         for cast in chromecasts:
             try:
                 cast.wait()
+                print(f"Device: {cast.name}, Type: {cast.cast_type}, Model: {cast.model_name}")
+
                 cast.set_volume(volume)
                 print(f"Volume set to {int(volume * 100)}% on {cast.name}")
 
+                # Check if device supports images (has a display)
+                is_audio_only = 'audio' in cast.model_name.lower() or 'mini' in cast.model_name.lower()
+
                 mc = cast.media_controller
-                mc.play_media(
-                    url,
-                    'audio/mp3',
-                    title=title_text,
-                    thumb=thumb_url,
-                    current_time=0,
-                    autoplay=True,
-                    stream_type='BUFFERED',
-                    metadata={
+
+                # Build metadata based on device capabilities
+                if is_audio_only:
+                    # Simpler metadata for audio-only devices
+                    metadata = {
+                        'metadataType': 3,
+                        'title': title_text,
+                        'artist': artist_text,
+                        'albumName': 'Daily Prayers'
+                    }
+                    print(f"Using audio-only metadata for {cast.name}")
+                else:
+                    # Full metadata with images for display-capable devices
+                    metadata = {
                         'metadataType': 3,
                         'title': title_text,
                         'artist': artist_text,
@@ -142,12 +152,24 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None):
                             }
                         ]
                     }
+
+                mc.play_media(
+                    url,
+                    'audio/mp3',
+                    title=title_text,
+                    thumb=thumb_url if not is_audio_only else None,
+                    current_time=0,
+                    autoplay=True,
+                    stream_type='BUFFERED',
+                    metadata=metadata
                 )
                 mc.block_until_active()
                 print(f"Started playing {title_text} on {cast.name}")
                 media_controllers.append((mc, cast.name))
             except Exception as e:
                 print(f"Error playing on {cast.name}: {e}")
+                import traceback
+                traceback.print_exc()
 
         # Wait for playback to complete in test mode
         if test_mode and media_controllers:
