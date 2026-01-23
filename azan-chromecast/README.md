@@ -45,6 +45,43 @@ Automatic prayer time notifications with Azan playback on Google Chromecast devi
    - `standard_azan.mp3` - Azan for prayers (required)
    - `fajr_azan.mp3` - Optional: Different Azan for Fajr prayer (if not provided, uses standard_azan.mp3)
 
+5. Find your computer's local IP address:
+   ```bash
+   # On macOS/Linux
+   ipconfig getifaddr en0  # For WiFi
+   # or
+   ifconfig | grep "inet " | grep -v 127.0.0.1
+   ```
+
+## Running the Scheduler
+
+### Start the Scheduler (Foreground)
+Activate the virtual environment and run:
+```bash
+source venv/bin/activate
+python prayer_times.py
+```
+Press `Ctrl+C` to stop.
+
+### Start the Scheduler (Background)
+To keep it running in the background with logging:
+```bash
+source venv/bin/activate
+nohup python prayer_times.py > /tmp/prayer_times.log 2>&1 &
+```
+
+### Check if Running
+```bash
+ps aux | grep prayer_times.py
+# or view the log
+tail -f /tmp/prayer_times.log
+```
+
+### Stop the Scheduler
+```bash
+pkill -f prayer_times.py
+```
+
 ## Usage
 
 ### Test Mode
@@ -61,14 +98,14 @@ python prayer_times.py --test-prayer Maghrib
 ```
 
 ### Run Scheduler
-Start the automatic prayer time scheduler:
-```bash
-python prayer_times.py
-```
+See the [Running the Scheduler](#running-the-scheduler) section above for:
+- Running in foreground or background
+- Viewing logs
+- Stopping the scheduler
 
-The script will:
+When running, the script will:
 - Generate monthly prayer times CSV
-- Monitor the clock
+- Monitor the clock every 30 seconds
 - Play Azan automatically at prayer times
 - Display prayer information on Chromecast
 
