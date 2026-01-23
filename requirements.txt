@@ -1,0 +1,3 @@
+pychromecast==13.0.8
+prayer-times-calculator==1.0.5
+Pillow==10.2.0
