@@ -42,8 +42,8 @@ Automatic prayer time notifications with Azan playback on Google Chromecast devi
    ```
 
 4. Add your audio files:
-   - `fajr_azan.mp3` - Azan for Fajr prayer
-   - `standard_azan.mp3` - Azan for other prayers
+   - `standard_azan.mp3` - Azan for prayers (required)
+   - `fajr_azan.mp3` - Optional: Different Azan for Fajr prayer (if not provided, uses standard_azan.mp3)
 
 ## Usage
 
@@ -96,8 +96,8 @@ azan-chromecast/
 ├── setup.sh                          # Setup script
 ├── README.md                         # This file
 ├── makkah-1-wide-optimized.jpeg      # Background image
-├── fajr_azan.mp3                     # Fajr prayer audio
-├── standard_azan.mp3                 # Standard prayer audio
+├── standard_azan.mp3                 # Standard prayer audio (required)
+├── fajr_azan.mp3                     # Fajr prayer audio (optional)
 ├── test-mp3.mp3                      # Test audio file
 └── prayers_YYYY_MM.csv               # Auto-generated prayer times
 ```
