@@ -5,10 +5,10 @@ Automatic prayer time notifications with Azan playback on Google Chromecast devi
 ## Quick Commands
 
 ```bash
-python prayer_times.py              # Run the scheduler
-python prayer_times.py --test       # Simulate next prayer with short test audio
-python prayer_times.py --test-prayer Maghrib  # Simulate a specific prayer
-python prayer_times.py --force      # Regenerate current month's CSV
+python3 prayer_times.py              # Run the scheduler
+python3 prayer_times.py --test       # Simulate next prayer with short test audio
+python3 prayer_times.py --test-prayer Maghrib  # Simulate a specific prayer
+python3 prayer_times.py --force      # Regenerate current month's CSV
 ```
 
 ## Features
@@ -64,7 +64,7 @@ python prayer_times.py --force      # Regenerate current month's CSV
 Activate the virtual environment and run:
 ```bash
 source venv/bin/activate
-python prayer_times.py
+python3 prayer_times.py
 ```
 Press `Ctrl+C` to stop.
 
@@ -72,7 +72,7 @@ Press `Ctrl+C` to stop.
 To keep it running in the background with logging:
 ```bash
 source venv/bin/activate
-nohup python prayer_times.py > /tmp/prayer_times.log 2>&1 &
+nohup python3 prayer_times.py > /tmp/prayer_times.log 2>&1 &
 ```
 
 ### Check if Running
@@ -92,20 +92,20 @@ pkill -f prayer_times.py
 ### Test Mode
 Simulates the next upcoming prayer using the short test audio file. Detects the real next prayer and plays with its name and metadata:
 ```bash
-python prayer_times.py --test
+python3 prayer_times.py --test
 ```
 
 ### Test Specific Prayer
 Test a specific prayer by name using the short test audio file:
 ```bash
-python prayer_times.py --test-prayer Fajr
-python prayer_times.py --test-prayer Maghrib
+python3 prayer_times.py --test-prayer Fajr
+python3 prayer_times.py --test-prayer Maghrib
 ```
 
 ### Force Regenerate CSV
 Re-generate the current month's prayer schedule (does not start the HTTP server):
 ```bash
-python prayer_times.py --force
+python3 prayer_times.py --force
 ```
 
 ### Run Scheduler

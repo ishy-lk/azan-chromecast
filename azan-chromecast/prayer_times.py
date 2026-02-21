@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import time
 import csv
 import os
@@ -32,7 +33,7 @@ def get_local_ip():
         return "127.0.0.1"
 
 # --- CONFIGURATION ---
-SPEAKER_OR_GROUP_NAME = ["Epsom"]  # Chromecast group name
+SPEAKER_OR_GROUP_NAME = ["Living Room Display", "Office speaker"]  # Individual devices
 LOCAL_IP = get_local_ip()  # Auto-detect local IP
 PORT = 8000
 FAJR_FILE = "fajr_azan.mp3"
@@ -154,7 +155,7 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None):
         log(f"\n{Colors.BOLD}{'='*60}{Colors.END}")
         log(f"{Colors.CYAN}Starting playback request at {datetime.now().strftime('%H:%M:%S')}{Colors.END}")
 
-        chromecasts, browser = pychromecast.get_listed_chromecasts(friendly_names=SPEAKER_OR_GROUP_NAME)
+        chromecasts, browser = pychromecast.get_listed_chromecasts(friendly_names=SPEAKER_OR_GROUP_NAME, discovery_timeout=10)
         if not chromecasts:
             browser.stop_discovery()
             log(f"{Colors.RED}❌ No devices found from list: {SPEAKER_OR_GROUP_NAME}{Colors.END}")
@@ -258,7 +259,13 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None):
                     stream_type='BUFFERED',
                     metadata=metadata
                 )
-                mc.block_until_active()
+                # Wait for media to become active (with hard timeout)
+                wait_start = time.time()
+                while time.time() - wait_start < 15:
+                    mc.update_status()
+                    if mc.status and mc.status.player_state in ['PLAYING', 'BUFFERING']:
+                        break
+                    time.sleep(0.5)
                 log(f"{Colors.GREEN}✅ Started playing {title_text} on {colored_name}{Colors.END}")
                 media_controllers.append((mc, cast.name))
 
