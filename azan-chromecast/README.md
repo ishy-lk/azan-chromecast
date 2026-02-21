@@ -2,15 +2,28 @@
 
 Automatic prayer time notifications with Azan playback on Google Chromecast devices. Displays prayer information with a beautiful background image while playing the Azan audio.
 
+## Quick Commands
+
+```bash
+python prayer_times.py              # Run the scheduler
+python prayer_times.py --test       # Simulate next prayer with short test audio
+python prayer_times.py --test-prayer Maghrib  # Simulate a specific prayer
+python prayer_times.py --force      # Regenerate current month's CSV
+```
+
 ## Features
 
 - ✅ Automatic prayer time calculation based on your location
 - ✅ Plays Azan on Chromecast at scheduled prayer times
 - ✅ Different Azan for Fajr and other prayers
-- ✅ Volume control (quieter for Fajr, normal for others)
+- ✅ Silent Fajr azan (casts with volume 0 so displays still show prayer info)
+- ✅ Volume control per prayer type
 - ✅ Beautiful visual display with prayer name and location
 - ✅ Optimized background image display
 - ✅ Monthly prayer time CSV generation for offline reliability
+- ✅ Auto-detects local IP address
+- ✅ Pre-generates next month's schedule near end of month
+- ✅ Event-driven scheduling (sleeps until next prayer instead of polling)
 - ✅ Test modes for easy debugging
 
 ## Requirements
@@ -34,24 +47,16 @@ Automatic prayer time notifications with Azan playback on Google Chromecast devi
 
 3. Configure `prayer_times.py`:
    ```python
-   SPEAKER_NAME = "Living Room Display"  # Your Chromecast name
-   LOCAL_IP = "192.168.1.221"            # Your computer's IP
-   LAT = 51.915949                        # Your latitude
-   LON = -0.181703                        # Your longitude
-   LOCATION = "Stevenage"                 # Your city
+   SPEAKER_OR_GROUP_NAME = ["Epsom"]  # Chromecast device/group name(s)
+   LAT = 51.915949                     # Your latitude
+   LON = -0.181703                     # Your longitude
+   LOCATION = "Stevenage"              # Your city
    ```
+   The local IP is auto-detected.
 
 4. Add your audio files:
    - `standard_azan.mp3` - Azan for prayers (required)
    - `fajr_azan.mp3` - Optional: Different Azan for Fajr prayer (if not provided, uses standard_azan.mp3)
-
-5. Find your computer's local IP address:
-   ```bash
-   # On macOS/Linux
-   ipconfig getifaddr en0  # For WiFi
-   # or
-   ifconfig | grep "inet " | grep -v 127.0.0.1
-   ```
 
 ## Running the Scheduler
 
@@ -85,16 +90,22 @@ pkill -f prayer_times.py
 ## Usage
 
 ### Test Mode
-Test the system with a short audio clip:
+Simulates the next upcoming prayer using the short test audio file. Detects the real next prayer and plays with its name and metadata:
 ```bash
 python prayer_times.py --test
 ```
 
 ### Test Specific Prayer
-Test how a specific prayer will display:
+Test a specific prayer by name using the short test audio file:
 ```bash
 python prayer_times.py --test-prayer Fajr
 python prayer_times.py --test-prayer Maghrib
+```
+
+### Force Regenerate CSV
+Re-generate the current month's prayer schedule (does not start the HTTP server):
+```bash
+python prayer_times.py --force
 ```
 
 ### Run Scheduler
@@ -104,9 +115,10 @@ See the [Running the Scheduler](#running-the-scheduler) section above for:
 - Stopping the scheduler
 
 When running, the script will:
-- Generate monthly prayer times CSV
-- Monitor the clock every 30 seconds
-- Play Azan automatically at prayer times
+- Generate monthly prayer times CSV (and pre-generate next month near end of month)
+- Display the full daily prayer schedule
+- Sleep until the next prayer time (no polling)
+- Play Azan automatically at prayer times (silent for Fajr)
 - Display prayer information on Chromecast
 
 ## Configuration Options
@@ -115,8 +127,8 @@ Edit `prayer_times.py` to customize:
 
 ```python
 # Volume settings (0.0 to 1.0)
-FAJR_VOLUME = 0.4       # 40% for early morning
-STANDARD_VOLUME = 0.7   # 70% for other prayers
+FAJR_VOLUME = 0.0       # Silent (still casts to show on displays)
+STANDARD_VOLUME = 0.5   # 50% for other prayers
 
 # Files
 FAJR_FILE = "fajr_azan.mp3"
@@ -142,10 +154,10 @@ azan-chromecast/
 ## How It Works
 
 1. **Prayer Time Calculation**: Uses the `prayer-times-calculator` library with your coordinates
-2. **Monthly CSV Generation**: Creates a CSV file with all prayer times for the month
-3. **Scheduler Loop**: Checks the current time every 30 seconds
-4. **Azan Playback**: When a prayer time matches, it:
-   - Sets appropriate volume (lower for Fajr)
+2. **Monthly CSV Generation**: Creates a CSV file with all prayer times for the month (pre-generates next month in the last 2 days)
+3. **Event-Driven Scheduling**: Loads the day's prayer times once, finds the next prayer, and sleeps until that exact time (no polling)
+4. **Azan Playback**: When a prayer time arrives, it:
+   - Sets appropriate volume (silent for Fajr, configurable for others)
    - Displays prayer name and location on Chromecast
    - Plays the corresponding Azan audio
    - Shows the Makkah background image

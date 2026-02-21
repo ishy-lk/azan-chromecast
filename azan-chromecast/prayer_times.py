@@ -3,12 +3,13 @@ import csv
 import os
 import sys
 import threading
+import traceback
 import http.server
 import socketserver
 import pychromecast
 import calendar
 import socket
-from datetime import datetime
+from datetime import datetime, timedelta
 from prayer_times_calculator import PrayerTimesCalculator
 
 # Force unbuffered output for logging
@@ -21,17 +22,17 @@ def log(message):
 def get_local_ip():
     """Auto-detect the local IP address"""
     try:
-        # Create a socket connection to determine local IP
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))  # Google DNS, doesn't actually send data
-        local_ip = s.getsockname()[0]
-        s.close()
-        return local_ip
+        try:
+            s.connect(("8.8.8.8", 80))
+            return s.getsockname()[0]
+        finally:
+            s.close()
     except Exception:
-        return "127.0.0.1"  # Fallback to localhost
+        return "127.0.0.1"
 
 # --- CONFIGURATION ---
-SPEAKER_OR_GROUP_NAME = ["Azan"]  # Chromecast group name
+SPEAKER_OR_GROUP_NAME = ["Epsom"]  # Chromecast group name
 LOCAL_IP = get_local_ip()  # Auto-detect local IP
 PORT = 8000
 FAJR_FILE = "fajr_azan.mp3"
@@ -45,7 +46,7 @@ LON = -0.181703
 LOCATION = "Stevenage"
 
 # Volume settings (0.0 to 1.0)
-FAJR_VOLUME = 0.2  # 20% for early morning
+FAJR_VOLUME = 0.0  # Silent (still casts to show on displays)
 STANDARD_VOLUME = 0.5  # 50% for other prayers
 
 # --- TERMINAL COLORS ---
@@ -84,8 +85,12 @@ def start_server():
         print(f"{Colors.YELLOW}⚠️  Warning: Could not start HTTP server on port {PORT}: {e}{Colors.END}")
         print(f"{Colors.YELLOW}   If the server is already running, this is fine. Otherwise, check the port.{Colors.END}")
 
-threading.Thread(target=start_server, daemon=True).start()
-time.sleep(1)  # Give server time to start
+def ensure_server_running():
+    """Start HTTP server if not already running"""
+    if not hasattr(ensure_server_running, '_started'):
+        threading.Thread(target=start_server, daemon=True).start()
+        time.sleep(1)
+        ensure_server_running._started = True
 
 # 2. Monthly CSV Generator (Ensures offline reliability)
 def generate_monthly_csv(year, month, force=False):
@@ -122,6 +127,28 @@ def generate_monthly_csv(year, month, force=False):
                 # Optional: continue to next day or retry
     return filename
 
+PRAYER_NAMES = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha']
+
+def load_today_prayers(csv_file):
+    """Load today's prayer times from CSV. Returns dict like {'Fajr': '05:45', ...} or None."""
+    today_str = datetime.now().strftime("%d/%m/%Y")
+    with open(csv_file, mode='r') as f:
+        for row in csv.DictReader(f):
+            if row['Date'] == today_str:
+                return {p: row[p] for p in PRAYER_NAMES}
+    return None
+
+def get_next_prayer(prayers):
+    """Find the next prayer from now. Returns (name, datetime) or (None, None) if all passed."""
+    now = datetime.now()
+    today = now.date()
+    for name in PRAYER_NAMES:
+        h, m = map(int, prayers[name].split(':'))
+        prayer_dt = datetime.combine(today, datetime.min.time().replace(hour=h, minute=m))
+        if prayer_dt > now:
+            return name, prayer_dt
+    return None, None
+
 def play_azan(is_fajr, test_mode=False, prayer_name=None):
     try:
         log(f"\n{Colors.BOLD}{'='*60}{Colors.END}")
@@ -129,6 +156,7 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None):
 
         chromecasts, browser = pychromecast.get_listed_chromecasts(friendly_names=SPEAKER_OR_GROUP_NAME)
         if not chromecasts:
+            browser.stop_discovery()
             log(f"{Colors.RED}❌ No devices found from list: {SPEAKER_OR_GROUP_NAME}{Colors.END}")
             return
 
@@ -239,22 +267,11 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None):
             except Exception as e:
                 colored_name_err = colorize_device_name(cast.name)
                 log(f"{Colors.RED}❌ Error playing on {colored_name_err}: {e}{Colors.END}")
-                import traceback
                 traceback.print_exc()
 
+        browser.stop_discovery()
         log(f"\n{Colors.GREEN}✅ Playback initiated on {len(media_controllers)} device(s){Colors.END}")
         log(f"{Colors.BOLD}{'='*60}{Colors.END}\n")
-
-        # Wait for playback to complete in test mode
-        if test_mode and media_controllers:
-            time.sleep(2)  # Give playback time to start
-            # Monitor the first device for completion
-            first_mc = media_controllers[0][0]
-            first_mc.update_status()
-            while first_mc.status.player_state in ['PLAYING', 'BUFFERING']:
-                time.sleep(1)
-                first_mc.update_status()
-            log(f"{Colors.GREEN}✅ Finished playing {title_text}{Colors.END}")
 
     except Exception as e:
         log(f"{Colors.RED}❌ Cast Error: {e}{Colors.END}")
@@ -263,10 +280,32 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None):
 print(f"{Colors.BOLD}{Colors.GREEN}🕌 Azan System Active for {LOCATION} coordinates{Colors.END}")
 print(f"{Colors.CYAN}📡 Using IP address: {LOCAL_IP}:{PORT}{Colors.END}")
 
-# Check for test mode
+# Check for force regenerate CSV mode (no server needed)
+if '--force' in sys.argv:
+    print(f"{Colors.BLUE}🔄 Force regenerating CSV for current month...{Colors.END}")
+    now = datetime.now()
+    generate_monthly_csv(now.year, now.month, force=True)
+    print(f"{Colors.GREEN}✅ CSV regeneration completed. Exiting.{Colors.END}")
+    sys.exit(0)
+
+# All modes below need the HTTP server
+ensure_server_running()
+
+# Check for test mode — mimics the real next azan
 if '--test' in sys.argv:
-    print(f"{Colors.BLUE}🧪 Running in test mode...{Colors.END}")
-    play_azan(is_fajr=False, test_mode=True)
+    print(f"{Colors.BLUE}🧪 Test mode: finding next prayer to simulate...{Colors.END}")
+    now = datetime.now()
+    test_csv = generate_monthly_csv(now.year, now.month)
+    test_prayers = load_today_prayers(test_csv)
+    if test_prayers:
+        test_name, _ = get_next_prayer(test_prayers)
+        if test_name is None:
+            test_name = 'Isha'  # Fallback if all prayers passed today
+    else:
+        test_name = 'Maghrib'  # Fallback if no CSV data
+    print(f"{Colors.BLUE}🕌 Simulating {test_name} azan...{Colors.END}")
+    play_azan(is_fajr=(test_name == 'Fajr'), test_mode=True, prayer_name=test_name)
+    time.sleep(30)
     print(f"{Colors.GREEN}✅ Test completed. Exiting.{Colors.END}")
     sys.exit(0)
 
@@ -281,32 +320,68 @@ if '--test-prayer' in sys.argv:
     print(f"{Colors.BLUE}🧪 Running test with {prayer_name} prayer display...{Colors.END}")
     is_fajr = prayer_name.lower() == 'fajr'
     play_azan(is_fajr=is_fajr, test_mode=True, prayer_name=prayer_name)
+    time.sleep(30)
     print(f"{Colors.GREEN}✅ Test completed. Exiting.{Colors.END}")
     sys.exit(0)
 
-# Check for force regenerate CSV mode
-if '--force' in sys.argv:
-    print(f"{Colors.BLUE}🔄 Force regenerating CSV for current month...{Colors.END}")
-    now = datetime.now()
-    generate_monthly_csv(now.year, now.month, force=True)
-    print(f"{Colors.GREEN}✅ CSV regeneration completed. Exiting.{Colors.END}")
-    sys.exit(0)
-
 # Normal scheduling mode
+cached_date = None
+prayers_today = None
+
 while True:
     now = datetime.now()
-    current_csv = generate_monthly_csv(now.year, now.month)
-    today_str = now.strftime("%d/%m/%Y")
-    now_time = now.strftime("%H:%M")
 
-    with open(current_csv, mode='r') as file:
-        reader = csv.DictReader(file)
-        for row in reader:
-            if row['Date'] == today_str:
-                for prayer in ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha']:
-                    if now_time == row[prayer]:
-                        log(f"{Colors.BOLD}{Colors.BLUE}🕌 It is time for {prayer} ({now_time}){Colors.END}")
-                        play_azan(is_fajr=(prayer == 'Fajr'), prayer_name=prayer)
-                        time.sleep(61)
+    # Reload prayer times when the date changes
+    if cached_date != now.date():
+        cached_date = now.date()
+        current_csv = generate_monthly_csv(now.year, now.month)
+        prayers_today = load_today_prayers(current_csv)
 
-    time.sleep(30)
+        if prayers_today is None:
+            log(f"{Colors.RED}❌ No prayer times found for {now.strftime('%d/%m/%Y')}{Colors.END}")
+            time.sleep(60)
+            continue
+
+        log(f"\n{Colors.BOLD}{Colors.GREEN}📅 Prayer schedule for {now.strftime('%d/%m/%Y')}:{Colors.END}")
+        for name in PRAYER_NAMES:
+            log(f"   {Colors.CYAN}{name:10s} {prayers_today[name]}{Colors.END}")
+
+        # Delete previous month's CSV on the 1st
+        if now.day == 1:
+            prev_month = now.replace(day=1) - timedelta(days=1)
+            prev_csv = f"prayers_{prev_month.year}_{prev_month.month:02d}.csv"
+            if os.path.exists(prev_csv):
+                os.remove(prev_csv)
+                log(f"{Colors.YELLOW}🗑️  Deleted old schedule: {prev_csv}{Colors.END}")
+
+        # Pre-generate next month's CSV in the last 2 days of the month
+        days_in_month = calendar.monthrange(now.year, now.month)[1]
+        if now.day >= days_in_month - 1:
+            next_month = now.replace(day=1) + timedelta(days=days_in_month)
+            generate_monthly_csv(next_month.year, next_month.month)
+
+    # Find the next prayer
+    next_name, next_dt = get_next_prayer(prayers_today)
+
+    if next_name is None:
+        # All prayers for today have passed — sleep until midnight
+        tomorrow = datetime.combine(now.date() + timedelta(days=1), datetime.min.time())
+        wait_secs = (tomorrow - now).total_seconds() + 1
+        log(f"{Colors.YELLOW}🌙 All prayers done for today. Sleeping until midnight ({int(wait_secs)}s)...{Colors.END}")
+        time.sleep(wait_secs)
+        continue
+
+    wait_secs = (next_dt - now).total_seconds()
+    hours, remainder = divmod(int(wait_secs), 3600)
+    minutes = remainder // 60
+    log(f"{Colors.BOLD}{Colors.CYAN}⏳ Next prayer: {next_name} at {prayers_today[next_name]} (in {hours}h {minutes}m){Colors.END}")
+
+    # Sleep until the prayer time
+    time.sleep(max(wait_secs, 0))
+
+    # Play the azan
+    log(f"{Colors.BOLD}{Colors.BLUE}🕌 It is time for {next_name} ({prayers_today[next_name]}){Colors.END}")
+    play_azan(is_fajr=(next_name == 'Fajr'), prayer_name=next_name)
+
+    # Wait 61s to avoid re-triggering for the same prayer
+    time.sleep(61)
