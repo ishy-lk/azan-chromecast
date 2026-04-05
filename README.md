@@ -11,6 +11,17 @@ python3 prayer_times.py --test-prayer Maghrib  # Simulate a specific prayer
 python3 prayer_times.py --force                # Regenerate current month's CSV
 ```
 
+## Service Management (macOS)
+
+```bash
+./service.sh install   # First-time: create the LaunchAgent plist
+./service.sh start     # Start the service
+./service.sh stop      # Stop the service
+./service.sh restart   # Restart (e.g. after a git pull)
+./service.sh status    # Check if running
+./service.sh logs      # Tail the log file
+```
+
 ## Features
 
 - Automatic prayer time calculation based on your coordinates
@@ -117,7 +128,19 @@ The prayer calculation method is `mwl` by default. Other options: `isna`, `egypt
 
 ## Running as a Background Service (macOS)
 
-To keep the scheduler running permanently (survives reboots and crashes), create a LaunchAgent:
+To keep the scheduler running permanently (survives reboots and crashes), use the included service manager:
+
+```bash
+./service.sh install   # Creates the LaunchAgent plist (auto-detects paths)
+./service.sh start     # Start the service
+```
+
+The `install` command generates `~/Library/LaunchAgents/com.prayer.azan.plist` with the correct paths for your machine. The service auto-starts on boot (`RunAtLoad`) and auto-restarts on crash (`KeepAlive`).
+
+Logs are written to `/tmp/prayer_times.log` — view them with `./service.sh logs`.
+
+<details>
+<summary>Manual plist setup (if not using service.sh)</summary>
 
 Create `~/Library/LaunchAgents/com.prayer.azan.plist`:
 ```xml
@@ -151,6 +174,7 @@ launchctl load ~/Library/LaunchAgents/com.prayer.azan.plist     # start
 launchctl unload ~/Library/LaunchAgents/com.prayer.azan.plist   # stop
 tail -f /tmp/prayer_times.log                                   # view logs
 ```
+</details>
 
 ## Running as a Background Service (Linux / Raspberry Pi)
 
@@ -228,6 +252,7 @@ azan-chromecast/
 ├── config.example.json           # Example config (tracked in git)
 ├── config.json                   # Your local config (gitignored)
 ├── requirements.txt              # Python dependencies
+├── service.sh                   # macOS service manager (start/stop/restart)
 ├── setup.sh                     # Setup script (creates venv)
 ├── README.md                    # This file
 ├── makkah-1-wide-optimized.jpeg # Background image for displays
