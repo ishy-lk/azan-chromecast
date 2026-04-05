@@ -40,9 +40,9 @@ python3 prayer_times.py --force                # Regenerate current month's CSV
    cd azan-chromecast
    ```
 
-2. Install dependencies:
+2. Run setup (creates venv and installs dependencies):
    ```bash
-   pip install -r requirements.txt
+   ./setup.sh
    ```
 
 3. Configure `prayer_times.py`:
@@ -59,6 +59,11 @@ python3 prayer_times.py --force                # Regenerate current month's CSV
    - `fajr_azan.mp3` — Optional: different Azan for Fajr (falls back to standard if missing)
 
 ## Running the Scheduler
+
+Activate the virtual environment first:
+```bash
+source venv/bin/activate
+```
 
 ### Foreground
 ```bash
