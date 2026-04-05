@@ -13,6 +13,9 @@ import socket
 from datetime import datetime, timedelta
 from prayer_times_calculator import PrayerTimesCalculator
 
+# Ensure we always serve files from the script's own directory
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
 # Force unbuffered output for logging
 sys.stdout.reconfigure(line_buffering=True) if hasattr(sys.stdout, 'reconfigure') else None
 
@@ -33,7 +36,7 @@ def get_local_ip():
         return "127.0.0.1"
 
 # --- CONFIGURATION ---
-SPEAKER_OR_GROUP_NAME = ["Living Room Display", "Office speaker"]  # Individual devices
+SPEAKER_OR_GROUP_NAME = ["HomeGroup"]  # Chromecast group name in Google Home app
 LOCAL_IP = get_local_ip()  # Auto-detect local IP
 PORT = 8000
 FAJR_FILE = "fajr_azan.mp3"
@@ -94,14 +97,29 @@ def ensure_server_running():
         ensure_server_running._started = True
 
 # 2. Monthly CSV Generator (Ensures offline reliability)
+def is_csv_complete(filename, year, month):
+    """Return True only if the CSV exists and has a row for every day in the month."""
+    if not os.path.exists(filename):
+        return False
+    expected_days = calendar.monthrange(year, month)[1]
+    try:
+        with open(filename, mode='r') as f:
+            row_count = sum(1 for _ in csv.DictReader(f))
+        return row_count == expected_days
+    except Exception:
+        return False
+
 def generate_monthly_csv(year, month, force=False):
     filename = f"prayers_{year}_{month:02d}.csv"
-    if os.path.exists(filename) and not force:
+    if is_csv_complete(filename, year, month) and not force:
         return filename
-    
-    if force and os.path.exists(filename):
+
+    if os.path.exists(filename):
         os.remove(filename)
-        print(f"{Colors.YELLOW}🗑️  Removed existing file: {filename}{Colors.END}")
+        if force:
+            print(f"{Colors.YELLOW}🗑️  Removed existing file: {filename}{Colors.END}")
+        else:
+            print(f"{Colors.YELLOW}⚠️  Incomplete CSV detected ({filename}), regenerating...{Colors.END}")
 
     print(f"{Colors.BLUE}📅 Generating local schedule for {calendar.month_name[month]} {year}...{Colors.END}")
     days_in_month = calendar.monthrange(year, month)[1]
@@ -119,9 +137,7 @@ def generate_monthly_csv(year, month, force=False):
                 writer.writerow([f"{day:02d}/{month:02d}/{year}", p['Fajr'], p['Dhuhr'], p['Asr'], p['Maghrib'], p['Isha']])
                 print(f"{Colors.CYAN}  ✓ Fetched times for {day:02d}/{month:02d}/{year}{Colors.END}")
 
-                # --- ADD THIS LINE ---
-                time.sleep(1) # Wait 1 second between days to avoid API errors
-                # ---------------------
+                time.sleep(1)  # Avoid API rate limiting
 
             except Exception as e:
                 print(f"{Colors.RED}  ✗ Error fetching day {day}: {e}{Colors.END}")
@@ -170,7 +186,10 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None):
         volume = FAJR_VOLUME if is_fajr else STANDARD_VOLUME
 
         if test_mode:
-            file = TEST_FILE
+            # Use the real azan file — test-mp3.mp3 is too short (3s) for group sync delay
+            file = FAJR_FILE if is_fajr else STANDARD_FILE
+            if not os.path.exists(file):
+                file = STANDARD_FILE
             if prayer_name:
                 title_text = f"{prayer_name} Prayer"
                 artist_text = f"It's time for {prayer_name} in {LOCATION}"
@@ -221,42 +240,36 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None):
                 cast.set_volume(volume)
                 log(f"{Colors.GREEN}🔊 Volume set to {int(volume * 100)}% on {colored_name}{Colors.END}")
 
-                # Check if device supports images (has a display)
+                # Groups broadcast metadata to every member including audio-only devices,
+                # so skip images to avoid audio speakers dropping out.
+                # Single display devices get full cover art.
+                is_group = cast.cast_type == 'group'
                 is_audio_only = 'audio' in cast.model_name.lower() or 'mini' in cast.model_name.lower()
+                use_images = not is_group and not is_audio_only
 
-                # Build metadata based on device capabilities
-                if is_audio_only:
-                    # Simpler metadata for audio-only devices
-                    metadata = {
-                        'metadataType': 3,
-                        'title': title_text,
-                        'artist': artist_text,
-                        'albumName': 'Daily Prayers'
-                    }
-                    log(f"{Colors.CYAN}🎧 Using audio-only metadata for {colored_name}{Colors.END}")
-                else:
-                    # Full metadata with images for display-capable devices
-                    metadata = {
-                        'metadataType': 3,
-                        'title': title_text,
-                        'artist': artist_text,
-                        'albumName': 'Daily Prayers',
-                        'images': [
-                            {
-                                'url': thumb_url
-                            }
-                        ]
-                    }
+                metadata = {
+                    'metadataType': 3,
+                    'title': title_text,
+                    'artist': artist_text,
+                    'albumName': 'Daily Prayers'
+                }
+                if use_images:
+                    metadata['images'] = [{'url': thumb_url}]
+
+                if is_group:
+                    log(f"{Colors.CYAN}👥 Group cast — skipping cover art to keep all members in sync{Colors.END}")
+                elif is_audio_only:
+                    log(f"{Colors.CYAN}🎧 Audio-only device — no cover art{Colors.END}")
 
                 log(f"{Colors.YELLOW}🎬 Sending play command to {colored_name}...{Colors.END}")
                 mc.play_media(
                     url,
-                    'audio/mp3',
+                    'audio/mpeg',
                     title=title_text,
-                    thumb=thumb_url if not is_audio_only else None,
+                    thumb=thumb_url if use_images else None,
                     current_time=0,
                     autoplay=True,
-                    stream_type='BUFFERED',
+                    stream_type='LIVE',
                     metadata=metadata
                 )
                 # Wait for media to become active (with hard timeout)
