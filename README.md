@@ -162,9 +162,8 @@ azan-chromecast/
 - Verify your `LAT` and `LON` coordinates
 - Check the calculation method in `generate_monthly_csv()` (default: `mwl`)
 
-## Running on Startup (Optional)
+## Running on Startup (macOS LaunchAgent)
 
-### macOS (LaunchAgent)
 Create `~/Library/LaunchAgents/com.prayer.azan.plist`:
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -175,45 +174,58 @@ Create `~/Library/LaunchAgents/com.prayer.azan.plist`:
     <string>com.prayer.azan</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/bin/python3</string>
-        <string>/Users/ishy/personal/azan-chromecast/prayer_times.py</string>
+        <string>/Users/ishy/personal/git/azan-chromecast/venv/bin/python3</string>
+        <string>/Users/ishy/personal/git/azan-chromecast/prayer_times.py</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
     <true/>
+    <key>StandardOutPath</key>
+    <string>/tmp/prayer_times.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/prayer_times.log</string>
 </dict>
 </plist>
 ```
 
-Load it:
+Load/unload:
 ```bash
-launchctl load ~/Library/LaunchAgents/com.prayer.azan.plist
+launchctl load ~/Library/LaunchAgents/com.prayer.azan.plist     # start
+launchctl unload ~/Library/LaunchAgents/com.prayer.azan.plist   # stop
+tail -f /tmp/prayer_times.log                                   # view logs
 ```
 
-### Linux (systemd)
-Create `/etc/systemd/system/prayer-azan.service`:
-```ini
-[Unit]
-Description=Prayer Times Azan Service
-After=network.target
+## Monitoring (iPhone)
 
-[Service]
-Type=simple
-User=ishy
-WorkingDirectory=/home/ishy/azan-chromecast
-ExecStart=/usr/bin/python3 prayer_times.py
-Restart=always
+The script runs an HTTP server on port 8000. Use iOS Shortcuts + Scriptable to check if the Mac is online and notify you if it goes down.
 
-[Install]
-WantedBy=multi-user.target
+### 1. Scriptable Script
+
+Install [Scriptable](https://apps.apple.com/app/scriptable/id1405459188) on your iPhone and create a script called `CheckMac`:
+
+```javascript
+let r = new Request("http://ishys-mac.local:8000")
+r.timeoutInterval = 10
+try {
+  await r.loadString()
+} catch (e) {
+  let n = new Notification()
+  n.title = "Mac Offline"
+  n.body = "ishys-mac is offline — Azan may not be running"
+  n.sound = "default"
+  await n.schedule()
+}
+Script.complete()
 ```
 
-Enable and start:
-```bash
-sudo systemctl enable prayer-azan
-sudo systemctl start prayer-azan
-```
+### 2. Shortcuts Automation
+
+1. Open **Shortcuts** app → **Automations** tab → **+**
+2. **Time of Day** → set time (e.g. 10:02) → **Daily** → toggle off **Ask Before Running**
+3. Add action: **Run Scriptable Script** → select `CheckMac`
+
+The automation runs daily. If the Mac's HTTP server is unreachable (Mac asleep, offline, or script not running), you get a push notification. No notification means everything is fine.
 
 ## Credits
 
