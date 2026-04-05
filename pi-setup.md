@@ -6,10 +6,13 @@ Hardware notes and setup instructions for running this project on a Raspberry Pi
 
 ## Hardware Used
 
-- Raspberry Pi 5 8GB
-- **ElectroCookie Mini PC Case for Raspberry Pi 5 with M.2 NVMe SSD PCIe HAT and Active RGB Lighting Cooler** (Black Case + M.2 HAT [X1001]) — supports 2230, 2242, 2260, 2280
-- NVMe SSD (see compatibility list below)
-- SONOFF Zigbee 3.0 USB Dongle Plus (for future Home Assistant / Zigbee use)
+| Item | Model | Price |
+|---|---|---|
+| Raspberry Pi 5 8GB | — | ~£75 |
+| Case + NVMe HAT | ElectroCookie Mini PC Case for Raspberry Pi 5 with M.2 NVMe SSD PCIe HAT and Active RGB Lighting Cooler (Black + M.2 HAT X1001) | £29.99 |
+| NVMe SSD | Crucial P3 Plus 500GB M.2 NVMe PCIe Gen4 (CT500P3PSSD8) | £73.89 |
+| Power Supply | Hafiuege 27W 5V 5.1A USB-C PD Power Adapter for Raspberry Pi 5 | £9.98 |
+| Zigbee Dongle | SONOFF Zigbee 3.0 USB Dongle Plus (for Home Assistant / Zigbee) | ~£18 |
 
 ---
 
