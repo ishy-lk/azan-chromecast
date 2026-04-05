@@ -170,13 +170,14 @@ def get_next_prayer(prayers):
     return None, None
 
 def play_azan(is_fajr, test_mode=False, prayer_name=None):
+    chromecasts = []
+    browser = None
     try:
         log(f"\n{Colors.BOLD}{'='*60}{Colors.END}")
         log(f"{Colors.CYAN}Starting playback request at {datetime.now().strftime('%H:%M:%S')}{Colors.END}")
 
         chromecasts, browser = pychromecast.get_listed_chromecasts(friendly_names=SPEAKER_OR_GROUP_NAME, discovery_timeout=10)
         if not chromecasts:
-            browser.stop_discovery()
             log(f"{Colors.RED}❌ No devices found from list: {SPEAKER_OR_GROUP_NAME}{Colors.END}")
             return
 
@@ -292,12 +293,27 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None):
                 log(f"{Colors.RED}❌ Error playing on {colored_name_err}: {e}{Colors.END}")
                 traceback.print_exc()
 
-        browser.stop_discovery()
         log(f"\n{Colors.GREEN}✅ Playback initiated on {len(media_controllers)} device(s){Colors.END}")
         log(f"{Colors.BOLD}{'='*60}{Colors.END}\n")
 
     except Exception as e:
         log(f"{Colors.RED}❌ Cast Error: {e}{Colors.END}")
+        traceback.print_exc()
+
+    finally:
+        # Always disconnect cast objects — stops their background socket threads.
+        # Without this, the socket client keeps trying to reconnect using a
+        # zeroconf instance that has already been stopped, spinning the CPU.
+        for cast in chromecasts:
+            try:
+                cast.disconnect()
+            except Exception:
+                pass
+        if browser is not None:
+            try:
+                browser.stop_discovery()
+            except Exception:
+                pass
 
 # 3. Main Loop
 print(f"{Colors.BOLD}{Colors.GREEN}🕌 Azan System Active for {LOCATION} coordinates{Colors.END}")
