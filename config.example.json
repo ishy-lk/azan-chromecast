@@ -1,0 +1,12 @@
+{
+  "speaker_or_group_name": ["HomeGroup"],
+  "lat": 51.5074,
+  "lon": -0.1278,
+  "location": "London",
+  "fajr_volume": 0.0,
+  "standard_volume": 0.5,
+  "fajr_file": "fajr_azan.mp3",
+  "standard_file": "standard_azan.mp3",
+  "bg_image": "makkah-1-wide-optimized.jpeg",
+  "port": 8000
+}

@@ -51,14 +51,26 @@ Place your audio file(s) in the project directory:
 
 ### 3. Configure your location and devices
 
-Edit the `# --- CONFIGURATION ---` section in `prayer_times.py`:
+Copy the example config and edit with your details:
 
-```python
-SPEAKER_OR_GROUP_NAME = ["My Speaker"]  # Chromecast device or group name from Google Home app
-LAT = 51.5074                           # Your latitude (find at latlong.net)
-LON = -0.1278                           # Your longitude
-LOCATION = "London"                     # Your city name (shown on display)
+```bash
+cp config.example.json config.json
 ```
+
+Edit `config.json`:
+
+```json
+{
+  "speaker_or_group_name": ["My Speaker"],
+  "lat": 51.5074,
+  "lon": -0.1278,
+  "location": "London",
+  "fajr_volume": 0.0,
+  "standard_volume": 0.5
+}
+```
+
+`config.json` is gitignored so your personal details stay out of version control. Only include the settings you want to override — defaults are built into the script.
 
 **Finding your Chromecast name:** Open the Google Home app → tap your device → Settings → the name shown at the top is what you use. To cast to multiple devices at once, create a Speaker Group in Google Home and use the group name.
 
@@ -88,18 +100,20 @@ The script will:
 
 ## Configuration Options
 
-```python
-# Volume (0.0 to 1.0)
-FAJR_VOLUME = 0.0       # Silent for early mornings (display still shows prayer info)
-STANDARD_VOLUME = 0.5   # 50% for Dhuhr, Asr, Maghrib, Isha
+All settings in `config.json` (see `config.example.json` for the full list):
 
-# Audio files
-FAJR_FILE = "fajr_azan.mp3"           # Optional (falls back to standard)
-STANDARD_FILE = "standard_azan.mp3"    # Required
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `speaker_or_group_name` | `["HomeGroup"]` | Chromecast device/group name(s) |
+| `lat` / `lon` | `51.5074` / `-0.1278` | Your coordinates ([latlong.net](https://www.latlong.net)) |
+| `location` | `"London"` | City name shown on display |
+| `fajr_volume` | `0.0` | Fajr volume (0.0 = silent, still shows on display) |
+| `standard_volume` | `0.5` | Volume for other prayers |
+| `fajr_file` | `"fajr_azan.mp3"` | Optional separate Fajr audio |
+| `standard_file` | `"standard_azan.mp3"` | Main Azan audio |
+| `port` | `8000` | HTTP server port |
 
-# Calculation method (in generate_monthly_csv)
-calculation_method = 'mwl'  # Options: mwl, isna, egypt, makkah, karachi, tehran, jafari
-```
+The prayer calculation method is `mwl` by default. Other options: `isna`, `egypt`, `makkah`, `karachi`, `tehran`, `jafari`.
 
 ## Running as a Background Service (macOS)
 
@@ -176,6 +190,8 @@ If the Mac is offline or the script isn't running, you'll get a notification. No
 ```
 azan-chromecast/
 ├── prayer_times.py               # Main script
+├── config.example.json           # Example config (tracked in git)
+├── config.json                   # Your local config (gitignored)
 ├── requirements.txt              # Python dependencies
 ├── setup.sh                     # Setup script (creates venv)
 ├── README.md                    # This file
@@ -183,7 +199,7 @@ azan-chromecast/
 ├── standard_azan.mp3            # Azan audio (required)
 ├── fajr_azan.mp3                # Fajr Azan audio (optional)
 ├── test-mp3.mp3                 # Short test audio
-└── prayers_YYYY_MM.csv          # Auto-generated monthly schedule
+└── prayers_YYYY_MM.csv          # Auto-generated monthly schedule (gitignored)
 ```
 
 ## Troubleshooting

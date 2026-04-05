@@ -11,6 +11,9 @@ ENV/
 # CSV files (auto-generated)
 prayers_*.csv
 
+# Local config (contains personal location/device details)
+config.json
+
 # IDE
 .vscode/
 .idea/

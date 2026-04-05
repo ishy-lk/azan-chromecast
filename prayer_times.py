@@ -3,6 +3,7 @@ import time
 import csv
 import os
 import sys
+import json
 import threading
 import traceback
 import http.server
@@ -36,23 +37,29 @@ def get_local_ip():
         return "127.0.0.1"
 
 # --- CONFIGURATION ---
-SPEAKER_OR_GROUP_NAME = ["HomeGroup"]  # Chromecast group name in Google Home app
-LOCAL_IP = get_local_ip()  # Auto-detect local IP
-PORT = 8000
-FAJR_FILE = "fajr_azan.mp3"
-STANDARD_FILE = "standard_azan.mp3"
-TEST_FILE = "test-mp3.mp3"  # For testing purposes
-BG_IMAGE = "makkah-1-wide-optimized.jpeg"  # Optimized image for faster loading
+# Load from config.json (gitignored) with defaults as fallback
+CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+if os.path.exists(CONFIG_FILE):
+    with open(CONFIG_FILE) as f:
+        _cfg = json.load(f)
+else:
+    print("⚠️  No config.json found — using defaults. Copy config.example.json to config.json and edit it.")
+    _cfg = {}
 
-# Your location — update these for your city
-# Find coordinates at https://www.latlong.net
-LAT = 51.5074
-LON = -0.1278
-LOCATION = "London"
+SPEAKER_OR_GROUP_NAME = _cfg.get("speaker_or_group_name", ["HomeGroup"])
+LOCAL_IP = get_local_ip()
+PORT = _cfg.get("port", 8000)
+FAJR_FILE = _cfg.get("fajr_file", "fajr_azan.mp3")
+STANDARD_FILE = _cfg.get("standard_file", "standard_azan.mp3")
+TEST_FILE = _cfg.get("test_file", "test-mp3.mp3")
+BG_IMAGE = _cfg.get("bg_image", "makkah-1-wide-optimized.jpeg")
 
-# Volume settings (0.0 to 1.0)
-FAJR_VOLUME = 0.0  # Silent (still casts to show on displays)
-STANDARD_VOLUME = 0.5  # 50% for other prayers
+LAT = _cfg.get("lat", 51.5074)
+LON = _cfg.get("lon", -0.1278)
+LOCATION = _cfg.get("location", "London")
+
+FAJR_VOLUME = _cfg.get("fajr_volume", 0.0)
+STANDARD_VOLUME = _cfg.get("standard_volume", 0.5)
 
 # --- TERMINAL COLORS ---
 class Colors:
