@@ -8,12 +8,12 @@ Hardware notes and setup instructions for running this project on a Raspberry Pi
 
 | Item | Model | Retailer | Price |
 |---|---|---|---|
-| Raspberry Pi 5 8GB | Raspberry Pi 5 8GB | Pimoroni / raspberrypi.com | ~£73 |
+| Raspberry Pi 5 8GB | Raspberry Pi 5 8GB | The Pi Hut / Pimoroni | £168.00 |
 | Case + NVMe HAT | ElectroCookie Mini PC Case with M.2 NVMe SSD PCIe HAT + Active RGB Cooler (Black + M.2 HAT X1001) | Amazon UK | £29.99 |
 | NVMe SSD | Crucial P3 Plus 500GB M.2 NVMe PCIe Gen4 (CT500P3PSSD8) | Amazon UK | £73.89 |
 | Power Supply | Hafiuege 27W 5V 5.1A USB-C PD Power Adapter for Raspberry Pi 5 | Amazon UK | £9.98 |
 | Zigbee Dongle | SONOFF Zigbee 3.0 USB Dongle Plus | — | ~£18 |
-| **Total** | | | **~£204** |
+| **Total** | | | **~£299** |
 
 ---
 
