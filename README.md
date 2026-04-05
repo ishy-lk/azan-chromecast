@@ -1,6 +1,6 @@
 # 🕌 Prayer Times Chromecast
 
-Automatic prayer time notifications with Azan playback on Google Chromecast devices. Displays prayer information with a beautiful background image while playing the Azan audio.
+Automatically plays the Azan (Islamic call to prayer) on Google Chromecast devices at the correct prayer times for your location. Displays prayer information with a background image on Chromecast displays while playing audio on all devices in a group.
 
 ## Quick Commands
 
@@ -13,156 +13,97 @@ python3 prayer_times.py --force                # Regenerate current month's CSV
 
 ## Features
 
-- ✅ Automatic prayer time calculation based on your location
-- ✅ Plays Azan on Chromecast at scheduled prayer times
-- ✅ Different Azan for Fajr and other prayers
-- ✅ Silent Fajr azan (casts with volume 0 so displays still show prayer info)
-- ✅ Volume control per prayer type
-- ✅ Beautiful visual display with prayer name and location
-- ✅ Optimized background image display
-- ✅ Monthly prayer time CSV generation for offline reliability
-- ✅ Auto-detects local IP address
-- ✅ Pre-generates next month's schedule near end of month
-- ✅ Event-driven scheduling (sleeps until next prayer instead of polling)
-- ✅ Test modes for easy debugging
+- Automatic prayer time calculation based on your coordinates
+- Plays Azan on Chromecast devices/groups at scheduled times
+- Silent Fajr mode (casts with volume 0 so displays still show prayer info)
+- Configurable volume per prayer type
+- Visual display with prayer name, location, and background image
+- Monthly prayer schedule CSV for offline reliability
+- Auto-detects local IP address
+- Pre-generates next month's schedule near end of month
+- Event-driven scheduling (sleeps until next prayer, no polling)
+- CSV validation ensures complete schedules (row count = days in month)
+- Test modes for easy setup verification
 
 ## Requirements
 
-- Python 3.8 or higher
-- Google Chromecast device on the same network
-- Your computer on the same WiFi network as the Chromecast
+- Python 3.8+
+- A Mac or Linux machine on the same WiFi as your Chromecast
+- One or more Google Chromecast devices (speakers, displays, or groups)
 
-## Quick Setup
+## Setup Guide
 
-1. Clone the repository:
-   ```bash
-   git clone github-personal:ishy-lk/azan-chromecast.git
-   cd azan-chromecast
-   ```
+### 1. Clone and install
 
-2. Run setup (creates venv and installs dependencies):
-   ```bash
-   ./setup.sh
-   ```
-
-3. Configure `prayer_times.py`:
-   ```python
-   SPEAKER_OR_GROUP_NAME = ["HomeGroup"]  # Chromecast device/group name in Google Home
-   LAT = 51.915949                        # Your latitude
-   LON = -0.181703                        # Your longitude
-   LOCATION = "Stevenage"                 # Your city
-   ```
-   The local IP is auto-detected.
-
-4. Add your audio files:
-   - `standard_azan.mp3` — Azan for all prayers (required)
-   - `fajr_azan.mp3` — Optional: different Azan for Fajr (falls back to standard if missing)
-
-## Running the Scheduler
-
-Activate the virtual environment first:
 ```bash
-source venv/bin/activate
+git clone https://github.com/ishy-lk/azan-chromecast.git
+cd azan-chromecast
+./setup.sh
 ```
 
-### Foreground
+This creates a Python virtual environment and installs dependencies.
+
+### 2. Add your Azan audio
+
+Place your audio file(s) in the project directory:
+- `standard_azan.mp3` — used for all prayers **(required)**
+- `fajr_azan.mp3` — optional separate Azan for Fajr (falls back to standard if missing)
+
+### 3. Configure your location and devices
+
+Edit the `# --- CONFIGURATION ---` section in `prayer_times.py`:
+
+```python
+SPEAKER_OR_GROUP_NAME = ["My Speaker"]  # Chromecast device or group name from Google Home app
+LAT = 51.5074                           # Your latitude (find at latlong.net)
+LON = -0.1278                           # Your longitude
+LOCATION = "London"                     # Your city name (shown on display)
+```
+
+**Finding your Chromecast name:** Open the Google Home app → tap your device → Settings → the name shown at the top is what you use. To cast to multiple devices at once, create a Speaker Group in Google Home and use the group name.
+
+**Finding your coordinates:** Go to [latlong.net](https://www.latlong.net), search your city, and copy the latitude/longitude values.
+
+### 4. Test it
+
+```bash
+source venv/bin/activate
+python3 prayer_times.py --test-prayer Dhuhr
+```
+
+You should hear the Azan on your Chromecast and see prayer info on any displays. Press `Ctrl+C` to stop.
+
+### 5. Run the scheduler
+
 ```bash
 python3 prayer_times.py
 ```
-Press `Ctrl+C` to stop.
 
-### Background (with logging)
-```bash
-nohup python3 prayer_times.py > /tmp/prayer_times.log 2>&1 &
-```
-
-### Check if Running
-```bash
-ps aux | grep prayer_times.py
-tail -f /tmp/prayer_times.log
-```
-
-### Stop
-```bash
-pkill -f prayer_times.py
-```
-
-## Usage
-
-### Test Mode
-Simulates the next upcoming prayer using the real azan audio:
-```bash
-python3 prayer_times.py --test
-```
-
-### Test Specific Prayer
-```bash
-python3 prayer_times.py --test-prayer Fajr
-python3 prayer_times.py --test-prayer Maghrib
-```
-
-### Force Regenerate CSV
-Re-generates the current month's prayer schedule:
-```bash
-python3 prayer_times.py --force
-```
+The script will:
+1. Generate a monthly prayer schedule CSV (if not already present)
+2. Show today's prayer times in the terminal
+3. Sleep until the next prayer time
+4. Play the Azan, then move to the next prayer
+5. At midnight, reload the next day's schedule
 
 ## Configuration Options
 
-Edit `prayer_times.py` to customise:
-
 ```python
-# Volume settings (0.0 to 1.0)
-FAJR_VOLUME = 0.0       # Silent (still casts to show on displays)
-STANDARD_VOLUME = 0.5   # 50% for other prayers
+# Volume (0.0 to 1.0)
+FAJR_VOLUME = 0.0       # Silent for early mornings (display still shows prayer info)
+STANDARD_VOLUME = 0.5   # 50% for Dhuhr, Asr, Maghrib, Isha
 
-# Files
-FAJR_FILE = "fajr_azan.mp3"
-STANDARD_FILE = "standard_azan.mp3"
-BG_IMAGE = "makkah-1-wide-optimized.jpeg"
+# Audio files
+FAJR_FILE = "fajr_azan.mp3"           # Optional (falls back to standard)
+STANDARD_FILE = "standard_azan.mp3"    # Required
+
+# Calculation method (in generate_monthly_csv)
+calculation_method = 'mwl'  # Options: mwl, isna, egypt, makkah, karachi, tehran, jafari
 ```
 
-## File Structure
+## Running as a Background Service (macOS)
 
-```
-azan-chromecast/
-├── prayer_times.py                    # Main script
-├── requirements.txt                   # Python dependencies
-├── setup.sh                          # Setup script
-├── README.md                         # This file
-├── makkah-1-wide-optimized.jpeg      # Background image
-├── standard_azan.mp3                 # Standard prayer audio (required)
-├── fajr_azan.mp3                     # Fajr prayer audio (optional)
-├── test-mp3.mp3                      # Short test audio
-└── prayers_YYYY_MM.csv               # Auto-generated prayer times
-```
-
-## How It Works
-
-1. **Prayer Time Calculation**: Uses the `prayer-times-calculator` library with your coordinates
-2. **Monthly CSV Generation**: Creates a CSV file with all prayer times for the month, validates row count equals days in month, and pre-generates next month in the last 2 days
-3. **Event-Driven Scheduling**: Loads the day's prayer times once, finds the next prayer, and sleeps until that exact time (no polling)
-4. **Azan Playback**: When a prayer time arrives, it:
-   - Sets appropriate volume (silent for Fajr, configurable for others)
-   - Displays prayer name and location on Chromecast
-   - Plays the corresponding Azan audio
-   - Shows the Makkah background image on display devices
-
-## Troubleshooting
-
-### Chromecast not found
-- Ensure both devices are on the same WiFi network
-- Check `SPEAKER_OR_GROUP_NAME` matches your Chromecast device/group name exactly (case-sensitive)
-
-### Image not loading
-- Ensure the HTTP server can reach the image file
-- Check that `LOCAL_IP` is detected correctly in the startup log
-
-### Prayer times incorrect
-- Verify your `LAT` and `LON` coordinates
-- Check the calculation method in `generate_monthly_csv()` (default: `mwl`)
-
-## Running on Startup (macOS LaunchAgent)
+To keep the scheduler running permanently (survives reboots and crashes), create a LaunchAgent:
 
 Create `~/Library/LaunchAgents/com.prayer.azan.plist`:
 ```xml
@@ -174,8 +115,8 @@ Create `~/Library/LaunchAgents/com.prayer.azan.plist`:
     <string>com.prayer.azan</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/ishy/personal/git/azan-chromecast/venv/bin/python3</string>
-        <string>/Users/ishy/personal/git/azan-chromecast/prayer_times.py</string>
+        <string>/path/to/azan-chromecast/venv/bin/python3</string>
+        <string>/path/to/azan-chromecast/prayer_times.py</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
@@ -189,49 +130,86 @@ Create `~/Library/LaunchAgents/com.prayer.azan.plist`:
 </plist>
 ```
 
-Load/unload:
+Replace `/path/to/azan-chromecast` with your actual path, then:
+
 ```bash
 launchctl load ~/Library/LaunchAgents/com.prayer.azan.plist     # start
 launchctl unload ~/Library/LaunchAgents/com.prayer.azan.plist   # stop
 tail -f /tmp/prayer_times.log                                   # view logs
 ```
 
-## Monitoring (iPhone)
+## Monitoring with iPhone (Optional)
 
-The script runs an HTTP server on port 8000. Use iOS Shortcuts + Scriptable to check if the Mac is online and notify you if it goes down.
+The script runs an HTTP server on port 8000 while active. You can use [Scriptable](https://apps.apple.com/app/scriptable/id1405459188) + iOS Shortcuts to get a daily push notification if the Mac goes offline.
 
 ### 1. Scriptable Script
 
-Install [Scriptable](https://apps.apple.com/app/scriptable/id1405459188) on your iPhone and create a script called `CheckMac`:
+Create a script called `CheckMac` in Scriptable:
 
 ```javascript
-let r = new Request("http://ishys-mac.local:8000")
+let r = new Request("http://YOUR-MAC-HOSTNAME.local:8000")
 r.timeoutInterval = 10
 try {
   await r.loadString()
 } catch (e) {
   let n = new Notification()
   n.title = "Mac Offline"
-  n.body = "ishys-mac is offline — Azan may not be running"
+  n.body = "Azan may not be running — check your Mac"
   n.sound = "default"
   await n.schedule()
 }
 Script.complete()
 ```
 
+Replace `YOUR-MAC-HOSTNAME` with your Mac's hostname (System Settings → General → Sharing → Local hostname).
+
 ### 2. Shortcuts Automation
 
-1. Open **Shortcuts** app → **Automations** tab → **+**
-2. **Time of Day** → set time (e.g. 10:02) → **Daily** → toggle off **Ask Before Running**
+1. Open **Shortcuts** → **Automations** → **+**
+2. **Time of Day** → pick a time → **Daily** → toggle off **Ask Before Running**
 3. Add action: **Run Scriptable Script** → select `CheckMac`
 
-The automation runs daily. If the Mac's HTTP server is unreachable (Mac asleep, offline, or script not running), you get a push notification. No notification means everything is fine.
+If the Mac is offline or the script isn't running, you'll get a notification. No notification means everything is working.
+
+## File Structure
+
+```
+azan-chromecast/
+├── prayer_times.py               # Main script
+├── requirements.txt              # Python dependencies
+├── setup.sh                     # Setup script (creates venv)
+├── README.md                    # This file
+├── makkah-1-wide-optimized.jpeg # Background image for displays
+├── standard_azan.mp3            # Azan audio (required)
+├── fajr_azan.mp3                # Fajr Azan audio (optional)
+├── test-mp3.mp3                 # Short test audio
+└── prayers_YYYY_MM.csv          # Auto-generated monthly schedule
+```
+
+## Troubleshooting
+
+### Chromecast not found
+- Ensure Mac and Chromecast are on the same WiFi network
+- Check `SPEAKER_OR_GROUP_NAME` matches your device/group name exactly (case-sensitive)
+- Try `python3 prayer_times.py --test` to verify discovery
+
+### No audio on some devices in a group
+- The script automatically skips cover art for group casts to prevent audio-only devices (e.g. Nest Mini) from dropping out of sync
+
+### Prayer times seem wrong
+- Verify your `LAT` and `LON` coordinates at [latlong.net](https://www.latlong.net)
+- Check the `calculation_method` — different methods are used in different regions
+- Run `python3 prayer_times.py --force` to regenerate the CSV
+
+### CSV incomplete
+- The script validates that the CSV has one row per day in the month
+- If incomplete (e.g. API was down during generation), it automatically regenerates on next run
 
 ## Credits
 
-- Prayer times calculation: [prayer-times-calculator](https://github.com/DrKhalil/prayer-times-calculator)
-- Chromecast control: [pychromecast](https://github.com/home-assistant-libs/pychromecast)
+- Prayer times: [prayer-times-calculator](https://github.com/DrKhalil/prayer-times-calculator)
+- Chromecast: [pychromecast](https://github.com/home-assistant-libs/pychromecast)
 
 ## License
 
-MIT License - Feel free to modify and use for your needs.
+MIT License — feel free to modify and use for your needs.

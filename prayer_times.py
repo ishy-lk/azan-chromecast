@@ -44,10 +44,11 @@ STANDARD_FILE = "standard_azan.mp3"
 TEST_FILE = "test-mp3.mp3"  # For testing purposes
 BG_IMAGE = "makkah-1-wide-optimized.jpeg"  # Optimized image for faster loading
 
-# Coordinates for Stevenage
-LAT = 51.915949
-LON = -0.181703
-LOCATION = "Stevenage"
+# Your location — update these for your city
+# Find coordinates at https://www.latlong.net
+LAT = 51.5074
+LON = -0.1278
+LOCATION = "London"
 
 # Volume settings (0.0 to 1.0)
 FAJR_VOLUME = 0.0  # Silent (still casts to show on displays)
@@ -64,13 +65,8 @@ class Colors:
     END    = '\033[0m'
 
 def get_device_color(device_name):
-    """Return the appropriate color for a device name"""
-    if 'Red Room' in device_name:
-        return Colors.RED
-    elif 'Living Room' in device_name:
-        return Colors.YELLOW
-    else:
-        return Colors.CYAN  # Default color for other devices
+    """Return a color for a device name in terminal output"""
+    return Colors.CYAN
 
 def colorize_device_name(device_name):
     """Return the device name with its unique color"""
