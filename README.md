@@ -152,6 +152,41 @@ launchctl unload ~/Library/LaunchAgents/com.prayer.azan.plist   # stop
 tail -f /tmp/prayer_times.log                                   # view logs
 ```
 
+## Running as a Background Service (Linux / Raspberry Pi)
+
+Create `/etc/systemd/system/prayer-azan.service`:
+```ini
+[Unit]
+Description=Prayer Times Azan Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/azan-chromecast
+ExecStart=/home/pi/azan-chromecast/venv/bin/python3 prayer_times.py
+Restart=always
+RestartSec=10
+StandardOutput=append:/var/log/prayer_times.log
+StandardError=append:/var/log/prayer_times.log
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Replace `pi` with your username and update paths as needed, then:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable prayer-azan     # start on boot
+sudo systemctl start prayer-azan      # start now
+sudo systemctl status prayer-azan     # check status
+sudo journalctl -u prayer-azan -f     # view logs
+```
+
+A Raspberry Pi is ideal for this — low power, always on, and sits on your home WiFi permanently.
+
 ## Monitoring with iPhone (Optional)
 
 The script runs an HTTP server on port 8000 while active. You can use [Scriptable](https://apps.apple.com/app/scriptable/id1405459188) + iOS Shortcuts to get a daily push notification if the Mac goes offline.
