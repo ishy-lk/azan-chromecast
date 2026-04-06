@@ -176,7 +176,7 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None):
         log(f"\n{Colors.BOLD}{'='*60}{Colors.END}")
         log(f"{Colors.CYAN}Starting playback request at {datetime.now().strftime('%H:%M:%S')}{Colors.END}")
 
-        chromecasts, browser = pychromecast.get_listed_chromecasts(friendly_names=SPEAKER_OR_GROUP_NAME, discovery_timeout=10)
+        chromecasts, browser = pychromecast.get_listed_chromecasts(friendly_names=list(SPEAKER_OR_GROUP_NAME), discovery_timeout=10)
         if not chromecasts:
             log(f"{Colors.RED}❌ No devices found from list: {SPEAKER_OR_GROUP_NAME}{Colors.END}")
             return
