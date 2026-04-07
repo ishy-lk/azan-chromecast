@@ -251,9 +251,12 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None, iqamah_time=None):
 
         volume = FAJR_VOLUME if is_fajr else STANDARD_VOLUME
 
-        # Build display text — iqamah appended if available (JSON mode only).
+        # Build display text across all 3 Cast metadata fields:
+        #   title     → "{Prayer} Prayer"
+        #   artist    → "It's time for {Prayer} in {Location}"
+        #   albumName → "Iqamah {time}" if available, else "Daily Prayers"
         # Cast metadata is UTF-8; emoji render on Nest Hub screen and in the Home app.
-        iqamah_suffix = f" | 🧎🏽‍♂️ Iqamah {iqamah_time} 🤲🏽" if iqamah_time else ""
+        album_text = f"🧎🏽‍♂️ Iqamah {iqamah_time} 🤲🏽" if iqamah_time else "Daily Prayers"
 
         if test_mode:
             file = FAJR_FILE if is_fajr else STANDARD_FILE
@@ -261,7 +264,7 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None, iqamah_time=None):
                 file = STANDARD_FILE
             if prayer_name:
                 title_text = f"{prayer_name} Prayer"
-                artist_text = f"It's time for {prayer_name} in {LOCATION}{iqamah_suffix}"
+                artist_text = f"It's time for {prayer_name} in {LOCATION}"
                 log(f"{Colors.BOLD}{Colors.BLUE}🎵 Playing {prayer_name} Azan (test){Colors.END}")
             else:
                 title_text = "Test Azan"
@@ -275,7 +278,7 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None, iqamah_time=None):
 
             if prayer_name:
                 title_text = f"{prayer_name} Prayer"
-                artist_text = f"It's time for {prayer_name} in {LOCATION}{iqamah_suffix}"
+                artist_text = f"It's time for {prayer_name} in {LOCATION}"
                 log(f"{Colors.BOLD}{Colors.BLUE}🕌 Playing {prayer_name} Azan{Colors.END}")
             else:
                 title_text = "Fajr Azan" if is_fajr else "Prayer Azan"
@@ -315,7 +318,7 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None, iqamah_time=None):
                     'metadataType': 3,
                     'title': title_text,
                     'artist': artist_text,
-                    'albumName': 'Daily Prayers'
+                    'albumName': album_text,
                 }
                 if use_images:
                     metadata['images'] = [{'url': thumb_url}]
