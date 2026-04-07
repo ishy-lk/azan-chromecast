@@ -28,6 +28,17 @@ cmd_install() {
         [[ ! $REPLY =~ ^[Yy]$ ]] && return
     fi
 
+    echo -e "${CYAN}Choose prayer times source:${END}"
+    echo "  1) --json     Fetch timetable from my-masjid.com (once per year)"
+    echo "  2) --longlat  Calculate from coordinates in config.json"
+    read -p "Enter 1 or 2 [default: 1]: " -n 1 -r MODE_CHOICE
+    echo
+    if [[ "$MODE_CHOICE" == "2" ]]; then
+        MODE_FLAG="--longlat"
+    else
+        MODE_FLAG="--json"
+    fi
+
     cat > "$PLIST_PATH" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -39,6 +50,7 @@ cmd_install() {
     <array>
         <string>$SCRIPT_DIR/venv/bin/python3</string>
         <string>$SCRIPT_DIR/prayer_times.py</string>
+        <string>$MODE_FLAG</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
@@ -52,7 +64,7 @@ cmd_install() {
 </plist>
 PLIST
 
-    echo -e "${GREEN}Installed plist at $PLIST_PATH${END}"
+    echo -e "${GREEN}Installed plist at $PLIST_PATH (mode: $MODE_FLAG)${END}"
     echo -e "${CYAN}Run ${BOLD}./service.sh start${END}${CYAN} to start the service${END}"
 }
 
