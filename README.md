@@ -18,6 +18,19 @@ python3 prayer_times.py --longlat --test-prayer Maghrib
 python3 prayer_times.py --longlat --force   # regenerate current month's CSV
 ```
 
+## Updating
+
+Once installed, updating is just:
+
+```bash
+git pull
+./service.sh restart   # macOS
+# or
+sudo systemctl restart prayer-azan   # Linux / Pi
+```
+
+`setup.sh` only needs to be run **once** on first install (or when `requirements.txt` changes). Your `config.json` is untouched by updates.
+
 ## Modes
 
 ### `--json` — My Masjid timetable (recommended)
