@@ -180,11 +180,15 @@ tail -f /tmp/prayer_times.log                                    # view logs
 
 ---
 
-## Setup Guide — Raspberry Pi 5
+## Setup Guide — Raspberry Pi
 
-A Pi 5 is ideal for this — low power, always on, and permanently on your home WiFi.
+If you already have a Raspberry Pi set up and running, this just adds the azan service alongside whatever else it's doing — it won't interfere with any existing services.
 
-### 1. Flash Raspberry Pi OS
+If you're starting fresh, a Pi is ideal for this: low power, always on, and permanently on your home WiFi.
+
+### 1. (Fresh Pi only) Flash Raspberry Pi OS
+
+Skip this step if your Pi is already running.
 
 Use [Raspberry Pi Imager](https://www.raspberrypi.com/software/) to flash **Raspberry Pi OS Bookworm (64-bit)** to your SD card. In the imager settings (the gear icon) configure:
 - Hostname (e.g. `prayer-pi`)
@@ -192,19 +196,12 @@ Use [Raspberry Pi Imager](https://www.raspberrypi.com/software/) to flash **Rasp
 - WiFi credentials
 - Enable SSH
 
-### 2. SSH in
-
+Then SSH in:
 ```bash
 ssh your-username@prayer-pi.local
 ```
 
-### 3. Update the system
-
-```bash
-sudo apt update && sudo apt upgrade -y
-```
-
-### 4. Clone and install
+### 2. Clone and install
 
 ```bash
 git clone https://github.com/ishy-lk/azan-chromecast.git
@@ -214,11 +211,11 @@ cd azan-chromecast
 
 When prompted, choose **yes** to create a virtual environment. On Raspberry Pi OS Bookworm, pip installs outside a venv are blocked by default — the venv handles this cleanly.
 
-### 5. Configure
+### 3. Configure
 
 ```bash
 cp config.example.json config.json
-nano config.json
+vi config.json
 ```
 
 ```json
@@ -231,19 +228,19 @@ nano config.json
 }
 ```
 
-### 7. Test it
+### 4. Test it
 
 ```bash
 source venv/bin/activate
 python3 prayer_times.py --json --test-prayer Dhuhr
 ```
 
-### 8. Set up the systemd service
+### 5. Set up the systemd service
 
 Create `/etc/systemd/system/prayer-azan.service`:
 
 ```bash
-sudo nano /etc/systemd/system/prayer-azan.service
+sudo vi /etc/systemd/system/prayer-azan.service
 ```
 
 Paste the following, replacing `your-username` with your Pi username:
