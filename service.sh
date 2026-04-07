@@ -68,6 +68,15 @@ PLIST
     echo -e "${CYAN}Run ${BOLD}./service.sh start${END}${CYAN} to start the service${END}"
 }
 
+show_startup_logs() {
+    echo -e "${CYAN}── startup log (5s) ──────────────────────────────${END}"
+    tail -f "$LOG_FILE" & TAIL_PID=$!
+    sleep 5
+    kill $TAIL_PID 2>/dev/null
+    wait $TAIL_PID 2>/dev/null
+    echo -e "${CYAN}── done — run ${BOLD}./service.sh logs${END}${CYAN} to follow live ──${END}"
+}
+
 cmd_start() {
     if ! [ -f "$PLIST_PATH" ]; then
         echo -e "${RED}Plist not found. Run ${BOLD}./service.sh install${END}${RED} first.${END}"
@@ -81,6 +90,7 @@ cmd_start() {
     sleep 1
     if is_running; then
         echo -e "${GREEN}Started${END}"
+        show_startup_logs
     else
         echo -e "${RED}Failed to start — check $LOG_FILE${END}"
     fi
