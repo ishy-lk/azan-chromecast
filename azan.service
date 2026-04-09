@@ -1,0 +1,17 @@
+[Unit]
+Description=Prayer Times Azan Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=YOUR_USERNAME
+WorkingDirectory=/home/YOUR_USERNAME/git/azan-chromecast
+ExecStart=/home/YOUR_USERNAME/git/azan-chromecast/venv/bin/python3 prayer_times.py --json
+Restart=always
+RestartSec=10
+StandardOutput=append:/var/log/prayer_times.log
+StandardError=append:/var/log/prayer_times.log
+
+[Install]
+WantedBy=multi-user.target

@@ -23,8 +23,7 @@ if not USE_JSON_MODE:
     try:
         from prayer_times_calculator import PrayerTimesCalculator
     except ImportError:
-        print("❌ prayer_times_calculator not installed. Run: pip install prayer-times-calculator")
-        print("   Or use --json mode to fetch from my-masjid.com instead.")
+        print('{"level":"error","msg":"missing_dependency","package":"prayer-times-calculator","hint":"pip install prayer-times-calculator or use --json mode"}', flush=True)
         sys.exit(1)
 
 # Ensure we always serve files from the script's own directory
@@ -33,8 +32,15 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 # Force unbuffered output for logging
 sys.stdout.reconfigure(line_buffering=True) if hasattr(sys.stdout, 'reconfigure') else None
 
-def log(message):
-    print(message, flush=True)
+def _log(level, msg, **fields):
+    entry = {"ts": datetime.now().isoformat(timespec='seconds'), "level": level, "msg": msg}
+    if fields:
+        entry.update(fields)
+    print(json.dumps(entry), flush=True)
+
+def log_info(msg, **fields):  _log("info",  msg, **fields)
+def log_warn(msg, **fields):  _log("warn",  msg, **fields)
+def log_error(msg, **fields): _log("error", msg, **fields)
 
 def get_local_ip():
     try:
@@ -53,7 +59,7 @@ if os.path.exists(CONFIG_FILE):
     with open(CONFIG_FILE) as f:
         _cfg = json.load(f)
 else:
-    print("⚠️  No config.json found — using defaults. Copy config.example.json to config.json and edit it.")
+    log_warn("config_missing", hint="copy config.example.json to config.json and edit it")
     _cfg = {}
 
 SPEAKER_OR_GROUP_NAME = _cfg.get("speaker_or_group_name", ["HomeGroup"])
@@ -75,30 +81,16 @@ MASJID_GUID = _cfg.get("masjid_guid", "3bf29ae9-f0ee-490f-bdb0-1a12695a2dd8")
 LAT = _cfg.get("lat", 51.5074)
 LON = _cfg.get("lon", -0.1278)
 
-# --- TERMINAL COLORS ---
-class Colors:
-    GREEN  = '\033[92m'
-    BLUE   = '\033[94m'
-    CYAN   = '\033[96m'
-    YELLOW = '\033[93m'
-    RED    = '\033[91m'
-    BOLD   = '\033[1m'
-    END    = '\033[0m'
-
-def colorize_device_name(device_name):
-    return f"{Colors.CYAN}{device_name}{Colors.END}"
-
 # 1. Background Web Server
 def start_server():
     handler = http.server.SimpleHTTPRequestHandler
     socketserver.TCPServer.allow_reuse_address = True
     try:
         with socketserver.TCPServer(("", PORT), handler) as httpd:
-            print(f"{Colors.GREEN}🌐 HTTP server started on port {PORT}{Colors.END}")
+            log_info("http_server_start", port=PORT)
             httpd.serve_forever()
     except OSError as e:
-        print(f"{Colors.YELLOW}⚠️  Warning: Could not start HTTP server on port {PORT}: {e}{Colors.END}")
-        print(f"{Colors.YELLOW}   If the server is already running, this is fine. Otherwise, check the port.{Colors.END}")
+        log_warn("http_server_error", port=PORT, error=str(e))
 
 def ensure_server_running():
     if not hasattr(ensure_server_running, '_started'):
@@ -111,7 +103,7 @@ def fetch_and_save_timetable(year):
     """Fetch full-year timetable from my-masjid.com and save to timetable_{year}.json."""
     url = (f"https://time.my-masjid.com/api/TimingsInfoScreen/"
            f"GetMasjidMultipleTimings?GuidId={MASJID_GUID}")
-    print(f"{Colors.BLUE}📡 Fetching timetable from my-masjid.com...{Colors.END}")
+    log_info("timetable_fetch", source="my-masjid.com", year=year)
     with urllib.request.urlopen(url, timeout=30) as resp:
         data = json.loads(resp.read())
 
@@ -149,7 +141,7 @@ def fetch_and_save_timetable(year):
     filename = f"timetable_{year}.json"
     with open(filename, 'w') as f:
         json.dump(timetable, f, indent=2)
-    print(f"{Colors.GREEN}✅ Saved {len(days)} days to {filename} ({masjid_name}){Colors.END}")
+    log_info("timetable_saved", file=filename, days=len(days), masjid=masjid_name)
     return timetable
 
 def ensure_timetable(year, force=False):
@@ -162,7 +154,7 @@ def ensure_timetable(year, force=False):
             fetched = datetime.strptime(timetable['fetched'], '%Y-%m-%d')
             if (datetime.now() - fetched).days <= 30:
                 return timetable
-            print(f"{Colors.YELLOW}🔄 Timetable last fetched {timetable['fetched']} — refreshing to check for updates...{Colors.END}")
+            log_info("timetable_stale", last_fetched=timetable['fetched'], action="refreshing")
         except (KeyError, ValueError):
             pass
     return fetch_and_save_timetable(year)
@@ -191,13 +183,10 @@ def generate_monthly_csv(year, month, force=False):
 
     if os.path.exists(filename):
         os.remove(filename)
-        if force:
-            print(f"{Colors.YELLOW}🗑️  Removed existing file: {filename}{Colors.END}")
-        else:
-            print(f"{Colors.YELLOW}⚠️  Incomplete or outdated CSV ({filename}), regenerating...{Colors.END}")
+        action = "force_regenerate" if force else "regenerate_incomplete"
+        log_info("csv_removed", file=filename, reason=action)
 
-    print(f"{Colors.BLUE}📅 Generating schedule for {calendar.month_name[month]} {year} "
-          f"({LAT}, {LON})...{Colors.END}")
+    log_info("csv_generate", year=year, month=month, lat=LAT, lon=LON)
     days_in_month = calendar.monthrange(year, month)[1]
 
     with open(filename, mode='w', newline='') as file:
@@ -206,15 +195,17 @@ def generate_monthly_csv(year, month, force=False):
         for day in range(1, days_in_month + 1):
             date_str = f"{year}-{month:02d}-{day:02d}"
             try:
+                utc_offset = datetime(year, month, day, 12).astimezone().utcoffset().total_seconds() / 3600
                 calc = PrayerTimesCalculator(latitude=LAT, longitude=LON,
-                                             calculation_method='mwl', date=date_str)
+                                             calculation_method='mwl', date=date_str,
+                                             time_zone=utc_offset)
                 p = calc.fetch_prayer_times()
                 writer.writerow([f"{day:02d}/{month:02d}/{year}",
                                   p['Fajr'], p['Dhuhr'], p['Asr'], p['Maghrib'], p['Isha']])
-                print(f"{Colors.CYAN}  ✓ {day:02d}/{month:02d}/{year}{Colors.END}")
+                log_info("csv_day_ok", date=date_str)
                 time.sleep(1)  # Avoid API rate limiting
             except Exception as e:
-                print(f"{Colors.RED}  ✗ Error fetching day {day}: {e}{Colors.END}")
+                log_error("csv_day_error", date=date_str, error=str(e))
     return filename
 
 def load_today_prayers_csv(csv_file):
@@ -242,19 +233,16 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None, iqamah_time=None):
     chromecasts = []
     browser = None
     try:
-        log(f"\n{Colors.BOLD}{'='*60}{Colors.END}")
-        log(f"{Colors.CYAN}Starting playback request at {datetime.now().strftime('%H:%M:%S')}{Colors.END}")
+        log_info("playback_start", prayer=prayer_name, test=test_mode)
 
         chromecasts, browser = pychromecast.get_listed_chromecasts(
             friendly_names=list(SPEAKER_OR_GROUP_NAME), discovery_timeout=10)
         if not chromecasts:
-            log(f"{Colors.RED}❌ No devices found from list: {SPEAKER_OR_GROUP_NAME}{Colors.END}")
+            log_error("playback_no_devices", targets=list(SPEAKER_OR_GROUP_NAME))
             return
 
-        device_list = [colorize_device_name(cast.name) for cast in chromecasts]
-        log(f"{Colors.GREEN}✅ Found {len(chromecasts)} device(s):{Colors.END}")
-        for device_info in device_list:
-            log(f"   {device_info}")
+        log_info("playback_devices_found", count=len(chromecasts),
+                 devices=[c.name for c in chromecasts])
 
         volume = FAJR_VOLUME if is_fajr else STANDARD_VOLUME
 
@@ -272,7 +260,6 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None, iqamah_time=None):
             if prayer_name:
                 title_text = f"{prayer_name} Prayer"
                 artist_text = f"It's time for {prayer_name} in {LOCATION}"
-                log(f"{Colors.BOLD}{Colors.BLUE}🎵 Playing {prayer_name} Azan (test){Colors.END}")
             else:
                 title_text = "Test Azan"
                 artist_text = f"{LOCATION} Prayer Time"
@@ -280,13 +267,12 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None, iqamah_time=None):
             file = FAJR_FILE if is_fajr else STANDARD_FILE
             if not os.path.exists(file):
                 if is_fajr:
-                    log(f"{Colors.YELLOW}⚠️  Note: {FAJR_FILE} not found, using {STANDARD_FILE}{Colors.END}")
+                    log_warn("fajr_file_missing", fallback=STANDARD_FILE, missing=FAJR_FILE)
                 file = STANDARD_FILE
 
             if prayer_name:
                 title_text = f"{prayer_name} Prayer"
                 artist_text = f"It's time for {prayer_name} in {LOCATION}"
-                log(f"{Colors.BOLD}{Colors.BLUE}🕌 Playing {prayer_name} Azan{Colors.END}")
             else:
                 title_text = "Fajr Azan" if is_fajr else "Prayer Azan"
                 artist_text = f"{LOCATION} Prayer Time"
@@ -294,28 +280,26 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None, iqamah_time=None):
         url = f"http://{LOCAL_IP}:{PORT}/{file}"
         thumb_url = f"http://{LOCAL_IP}:{PORT}/{BG_IMAGE}"
 
-        log(f"{Colors.CYAN}📡 Audio URL: {url}{Colors.END}")
-        log(f"{Colors.CYAN}🖼️  Image URL: {thumb_url}{Colors.END}")
+        log_info("playback_urls", audio=url, image=thumb_url)
 
         media_controllers = []
-        log(f"\n{Colors.BOLD}Attempting to play on {len(chromecasts)} device(s)...{Colors.END}\n")
 
         for cast in chromecasts:
             try:
                 cast.wait()
-                colored_name = colorize_device_name(cast.name)
-                log(f"{Colors.CYAN}📱 Device: {colored_name}, Type: {cast.cast_type}, "
-                    f"Model: {cast.model_name}{Colors.END}")
+                log_info("playback_device_connect", device=cast.name,
+                         type=cast.cast_type, model=cast.model_name)
 
                 mc = cast.media_controller
                 mc.update_status()
                 if mc.status.player_state in ['PLAYING', 'BUFFERING', 'PAUSED']:
-                    log(f"{Colors.YELLOW}⏹️  Stopping existing playback on {colored_name}...{Colors.END}")
+                    log_info("playback_stop_existing", device=cast.name,
+                             state=mc.status.player_state)
                     mc.stop()
                     time.sleep(0.3)
 
                 cast.set_volume(volume)
-                log(f"{Colors.GREEN}🔊 Volume set to {int(volume * 100)}% on {colored_name}{Colors.END}")
+                log_info("playback_volume_set", device=cast.name, volume=round(volume, 2))
 
                 is_group = cast.cast_type == 'group'
                 is_audio_only = 'audio' in cast.model_name.lower() or 'mini' in cast.model_name.lower()
@@ -331,11 +315,11 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None, iqamah_time=None):
                     metadata['images'] = [{'url': thumb_url}]
 
                 if is_group:
-                    log(f"{Colors.CYAN}👥 Group cast — skipping cover art to keep all members in sync{Colors.END}")
+                    log_info("playback_no_art", device=cast.name, reason="group_cast")
                 elif is_audio_only:
-                    log(f"{Colors.CYAN}🎧 Audio-only device — no cover art{Colors.END}")
+                    log_info("playback_no_art", device=cast.name, reason="audio_only")
 
-                log(f"{Colors.YELLOW}🎬 Sending play command to {colored_name}...{Colors.END}")
+                log_info("playback_send", device=cast.name, title=title_text)
                 mc.play_media(
                     url,
                     'audio/mpeg',
@@ -352,20 +336,18 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None, iqamah_time=None):
                     if mc.status and mc.status.player_state in ['PLAYING', 'BUFFERING']:
                         break
                     time.sleep(0.5)
-                log(f"{Colors.GREEN}✅ Started playing {title_text} on {colored_name}{Colors.END}")
+                log_info("playback_ok", device=cast.name, title=title_text)
                 media_controllers.append((mc, cast.name))
 
                 time.sleep(0.5)
             except Exception as e:
-                colored_name_err = colorize_device_name(cast.name)
-                log(f"{Colors.RED}❌ Error playing on {colored_name_err}: {e}{Colors.END}")
+                log_error("playback_device_error", device=cast.name, error=str(e))
                 traceback.print_exc()
 
-        log(f"\n{Colors.GREEN}✅ Playback initiated on {len(media_controllers)} device(s){Colors.END}")
-        log(f"{Colors.BOLD}{'='*60}{Colors.END}\n")
+        log_info("playback_complete", devices_succeeded=len(media_controllers))
 
     except Exception as e:
-        log(f"{Colors.RED}❌ Cast Error: {e}{Colors.END}")
+        log_error("playback_error", error=str(e))
         traceback.print_exc()
 
     finally:
@@ -382,19 +364,24 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None, iqamah_time=None):
 
 # --- STARTUP ---
 mode_label = "my-masjid.com JSON" if USE_JSON_MODE else f"lon/lat ({LAT}, {LON})"
-print(f"{Colors.BOLD}{Colors.GREEN}🕌 Azan System Active — {LOCATION} [{mode_label}]{Colors.END}")
-print(f"{Colors.CYAN}📡 Using IP address: {LOCAL_IP}:{PORT}{Colors.END}")
+log_info("service_start",
+         location=LOCATION,
+         mode=mode_label,
+         config=CONFIG_FILE,
+         devices=list(SPEAKER_OR_GROUP_NAME),
+         ip=LOCAL_IP,
+         port=PORT)
 
 # --force: re-fetch timetable (JSON mode) or regenerate current month CSV (longlat mode)
 if '--force' in sys.argv:
     now = datetime.now()
     if USE_JSON_MODE:
-        print(f"{Colors.BLUE}🔄 Force re-fetching timetable from my-masjid.com...{Colors.END}")
+        log_info("force_refresh", source="my-masjid.com")
         ensure_timetable(now.year, force=True)
     else:
-        print(f"{Colors.BLUE}🔄 Force regenerating CSV for current month...{Colors.END}")
+        log_info("force_refresh", source="longlat_csv")
         generate_monthly_csv(now.year, now.month, force=True)
-    print(f"{Colors.GREEN}✅ Done. Exiting.{Colors.END}")
+    log_info("force_refresh_done")
     sys.exit(0)
 
 # All modes below need the HTTP server
@@ -402,7 +389,7 @@ ensure_server_running()
 
 # --test: simulate the next upcoming prayer
 if '--test' in sys.argv:
-    print(f"{Colors.BLUE}🧪 Test mode: finding next prayer to simulate...{Colors.END}")
+    log_info("test_mode_start")
     now = datetime.now()
     if USE_JSON_MODE:
         timetable = ensure_timetable(now.year)
@@ -418,11 +405,11 @@ if '--test' in sys.argv:
     else:
         test_name = 'Maghrib'
     iqamah_time = (test_prayers.get(f'{test_name}_Iqamah') or None) if (USE_JSON_MODE and test_prayers) else None
-    print(f"{Colors.BLUE}🕌 Simulating {test_name} azan...{Colors.END}")
+    log_info("test_simulate", prayer=test_name)
     play_azan(is_fajr=(test_name == 'Fajr'), test_mode=True,
               prayer_name=test_name, iqamah_time=iqamah_time)
     time.sleep(30)
-    print(f"{Colors.GREEN}✅ Test completed. Exiting.{Colors.END}")
+    log_info("test_complete")
     sys.exit(0)
 
 # --test-prayer NAME: test a specific named prayer
@@ -433,7 +420,7 @@ if '--test-prayer' in sys.argv:
     except (ValueError, IndexError):
         prayer_name = "Maghrib"
 
-    print(f"{Colors.BLUE}🧪 Running test with {prayer_name} prayer display...{Colors.END}")
+    log_info("test_prayer_start", prayer=prayer_name)
     is_fajr = prayer_name.lower() == 'fajr'
     iqamah_time = None
     try:
@@ -450,7 +437,7 @@ if '--test-prayer' in sys.argv:
 
     play_azan(is_fajr=is_fajr, test_mode=True, prayer_name=prayer_name, iqamah_time=iqamah_time)
     time.sleep(30)
-    print(f"{Colors.GREEN}✅ Test completed. Exiting.{Colors.END}")
+    log_info("test_complete")
     sys.exit(0)
 
 # Normal scheduling mode
@@ -475,29 +462,25 @@ while True:
                 prev_file = f"timetable_{now.year - 1}.json"
                 if os.path.exists(prev_file):
                     os.remove(prev_file)
-                    log(f"{Colors.YELLOW}🗑️  Deleted old timetable: {prev_file}{Colors.END}")
+                    log_info("timetable_old_removed", file=prev_file)
             prayers_today = timetable['days'].get(now.strftime("%d/%m"))
         else:
             current_csv = generate_monthly_csv(now.year, now.month)
             prayers_today = load_today_prayers_csv(current_csv)
 
         if prayers_today is None:
-            log(f"{Colors.RED}❌ No prayer times found for {now.strftime('%d/%m/%Y')}{Colors.END}")
+            log_error("schedule_missing", date=now.strftime('%Y-%m-%d'))
             time.sleep(60)
             continue
 
-        log(f"\n{Colors.BOLD}{Colors.GREEN}📅 Prayer schedule for {now.strftime('%d/%m/%Y')}:{Colors.END}")
-        sunrise = prayers_today.get('Sunrise', '')
+        schedule = {name: prayers_today[name] for name in PRAYER_NAMES}
+        sunrise = prayers_today.get('Sunrise')
         if sunrise:
-            log(f"   {Colors.CYAN}{'Sunrise':10s} {sunrise}{Colors.END}")
-        for name in PRAYER_NAMES:
-            iqamah = prayers_today.get(f'{name}_Iqamah', '')
-            iqamah_str = f"  (Iqamah: {iqamah})" if iqamah else ""
-            log(f"   {Colors.CYAN}{name:10s} {prayers_today[name]}{iqamah_str}{Colors.END}")
-        jumah = prayers_today.get('Jumah', '')
+            schedule['Sunrise'] = sunrise
+        jumah = prayers_today.get('Jumah')
         if jumah:
-            jumah_label = "Jumu'ah"
-            log(f"   {Colors.CYAN}{jumah_label:10s} {jumah}{Colors.END}")
+            schedule['Jumah'] = jumah
+        log_info("schedule_loaded", date=now.strftime('%Y-%m-%d'), **schedule)
 
         if not USE_JSON_MODE:
             # Delete previous month's CSV on the 1st
@@ -506,7 +489,7 @@ while True:
                 prev_csv = f"prayers_{prev_month.year}_{prev_month.month:02d}.csv"
                 if os.path.exists(prev_csv):
                     os.remove(prev_csv)
-                    log(f"{Colors.YELLOW}🗑️  Deleted old schedule: {prev_csv}{Colors.END}")
+                    log_info("csv_old_removed", file=prev_csv)
 
             # Pre-generate next month's CSV in the last 2 days of the month
             days_in_month = calendar.monthrange(now.year, now.month)[1]
@@ -520,19 +503,17 @@ while True:
     if next_name is None:
         tomorrow = datetime.combine(now.date() + timedelta(days=1), datetime.min.time())
         wait_secs = (tomorrow - now).total_seconds() + 1
-        log(f"{Colors.YELLOW}🌙 All prayers done for today. Sleeping until midnight ({int(wait_secs)}s)...{Colors.END}")
+        log_info("prayers_done", wait_seconds=int(wait_secs))
         time.sleep(wait_secs)
         continue
 
     wait_secs = (next_dt - now).total_seconds()
-    hours, remainder = divmod(int(wait_secs), 3600)
-    minutes = remainder // 60
-    log(f"{Colors.BOLD}{Colors.CYAN}⏳ Next prayer: {next_name} at {prayers_today[next_name]} "
-        f"(in {hours}h {minutes}m){Colors.END}")
+    log_info("next_prayer", prayer=next_name, at=prayers_today[next_name],
+             wait_seconds=int(wait_secs))
 
     time.sleep(max(wait_secs, 0))
 
-    log(f"{Colors.BOLD}{Colors.BLUE}🕌 It is time for {next_name} ({prayers_today[next_name]}){Colors.END}")
+    log_info("prayer_time", prayer=next_name, scheduled=prayers_today[next_name])
     iqamah_time = prayers_today.get(f'{next_name}_Iqamah') or None if USE_JSON_MODE else None
     play_azan(is_fajr=(next_name == 'Fajr'), prayer_name=next_name, iqamah_time=iqamah_time)
 

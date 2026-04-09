@@ -108,7 +108,7 @@ cp config.example.json config.json
 nano config.json
 
 # Install and start the service (Linux/systemd)
-sudo cp azan.service /etc/systemd/system/prayer-azan.service   # see README for full service file
+sed "s/YOUR_USERNAME/$USER/g" azan.service | sudo tee /etc/systemd/system/prayer-azan.service
 sudo systemctl daemon-reload
 sudo systemctl enable prayer-azan
 sudo systemctl start prayer-azan
