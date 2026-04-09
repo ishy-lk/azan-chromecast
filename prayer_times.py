@@ -277,10 +277,11 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None, iqamah_time=None):
                 title_text = "Fajr Azan" if is_fajr else "Prayer Azan"
                 artist_text = f"{LOCATION} Prayer Time"
 
-        url = f"http://{LOCAL_IP}:{PORT}/{file}"
-        thumb_url = f"http://{LOCAL_IP}:{PORT}/{BG_IMAGE}"
+        current_ip = get_local_ip()
+        url = f"http://{current_ip}:{PORT}/{file}"
+        thumb_url = f"http://{current_ip}:{PORT}/{BG_IMAGE}"
 
-        log_info("playback_urls", audio=url, image=thumb_url)
+        log_info("playback_urls", audio=url, image=thumb_url, ip=current_ip)
 
         media_controllers = []
 
