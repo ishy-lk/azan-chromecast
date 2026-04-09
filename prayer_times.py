@@ -12,6 +12,7 @@ import pychromecast
 import calendar
 import socket
 import urllib.request
+import urllib.parse
 from datetime import datetime, timedelta
 
 # --- MODE SELECTION ---
@@ -81,12 +82,40 @@ MASJID_GUID = _cfg.get("masjid_guid", "3bf29ae9-f0ee-490f-bdb0-1a12695a2dd8")
 LAT = _cfg.get("lat", 51.5074)
 LON = _cfg.get("lon", -0.1278)
 
-# 1. Background Web Server
+# 1. Background Web Server + REST API
+class AzanHTTPHandler(http.server.SimpleHTTPRequestHandler):
+    def do_GET(self):
+        parsed = urllib.parse.urlparse(self.path)
+        if parsed.path == '/api/play':
+            params = urllib.parse.parse_qs(parsed.query)
+            url = params.get('url', [None])[0]
+            if url:
+                threading.Thread(target=cast_radio, args=(url,), daemon=True).start()
+                self._json({"status": "ok", "action": "play", "url": url})
+            else:
+                self._json({"status": "error", "msg": "missing url param"}, 400)
+        elif parsed.path == '/api/stop':
+            threading.Thread(target=stop_cast, daemon=True).start()
+            self._json({"status": "ok", "action": "stop"})
+        else:
+            super().do_GET()
+
+    def _json(self, data, code=200):
+        body = json.dumps(data).encode()
+        self.send_response(code)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', len(body))
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, format, *args):
+        log_info("http_request", path=self.path, client=self.client_address[0])
+
 def start_server():
-    handler = http.server.SimpleHTTPRequestHandler
     socketserver.TCPServer.allow_reuse_address = True
     try:
-        with socketserver.TCPServer(("", PORT), handler) as httpd:
+        with socketserver.TCPServer(("", PORT), AzanHTTPHandler) as httpd:
             log_info("http_server_start", port=PORT)
             httpd.serve_forever()
     except OSError as e:
@@ -228,6 +257,61 @@ def get_next_prayer(prayers):
         if prayer_dt > now:
             return name, prayer_dt
     return None, None
+
+def _cast_connect():
+    """Discover and return (chromecasts, browser)."""
+    return pychromecast.get_listed_chromecasts(
+        friendly_names=list(SPEAKER_OR_GROUP_NAME), discovery_timeout=10)
+
+def _cast_cleanup(chromecasts, browser):
+    for cast in chromecasts:
+        try: cast.disconnect()
+        except Exception: pass
+    if browser:
+        try: browser.stop_discovery()
+        except Exception: pass
+
+def cast_radio(url, volume=None):
+    """Cast an arbitrary URL (e.g. live radio stream) to all devices."""
+    chromecasts, browser = [], None
+    try:
+        log_info("radio_start", url=url)
+        chromecasts, browser = _cast_connect()
+        if not chromecasts:
+            log_error("radio_no_devices", targets=list(SPEAKER_OR_GROUP_NAME))
+            return
+        vol = volume if volume is not None else STANDARD_VOLUME
+        for cast in chromecasts:
+            try:
+                cast.wait()
+                cast.set_volume(vol)
+                cast.media_controller.play_media(
+                    url, 'audio/mpeg', title="Radio", autoplay=True, stream_type='LIVE')
+                log_info("radio_ok", device=cast.name)
+            except Exception as e:
+                log_error("radio_device_error", device=cast.name, error=str(e))
+    except Exception as e:
+        log_error("radio_error", error=str(e))
+    finally:
+        _cast_cleanup(chromecasts, browser)
+
+def stop_cast():
+    """Stop playback on all devices."""
+    chromecasts, browser = [], None
+    try:
+        log_info("cast_stop")
+        chromecasts, browser = _cast_connect()
+        for cast in chromecasts:
+            try:
+                cast.wait()
+                cast.media_controller.stop()
+                log_info("cast_stop_ok", device=cast.name)
+            except Exception as e:
+                log_error("cast_stop_error", device=cast.name, error=str(e))
+    except Exception as e:
+        log_error("cast_stop_error", error=str(e))
+    finally:
+        _cast_cleanup(chromecasts, browser)
 
 def play_azan(is_fajr, test_mode=False, prayer_name=None, iqamah_time=None):
     chromecasts = []
