@@ -11,6 +11,9 @@ ENV/
 # CSV files (auto-generated)
 prayers_*.csv
 
+# JSON timetable (auto-generated, masjid-specific)
+timetable_*.json
+
 # Local config (contains personal location/device details)
 config.json
 

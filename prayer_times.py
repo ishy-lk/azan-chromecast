@@ -153,12 +153,19 @@ def fetch_and_save_timetable(year):
     return timetable
 
 def ensure_timetable(year, force=False):
-    """Return loaded timetable for year, fetching from API if the file is missing or forced."""
+    """Return loaded timetable for year, fetching from API if the file is missing, forced, or stale (>30 days)."""
     filename = f"timetable_{year}.json"
-    if force or not os.path.exists(filename):
-        return fetch_and_save_timetable(year)
-    with open(filename) as f:
-        return json.load(f)
+    if not force and os.path.exists(filename):
+        with open(filename) as f:
+            timetable = json.load(f)
+        try:
+            fetched = datetime.strptime(timetable['fetched'], '%Y-%m-%d')
+            if (datetime.now() - fetched).days <= 30:
+                return timetable
+            print(f"{Colors.YELLOW}🔄 Timetable last fetched {timetable['fetched']} — refreshing to check for updates...{Colors.END}")
+        except (KeyError, ValueError):
+            pass
+    return fetch_and_save_timetable(year)
 
 # 2b. Longlat mode — monthly CSV from PrayerTimesCalculator
 LONGLAT_CSV_FIELDS = ["Date", "Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]
@@ -460,10 +467,11 @@ while True:
         cached_date = now.date()
 
         if USE_JSON_MODE:
-            # Load (or fetch) the full-year timetable once; refresh on new year
-            if cached_year != now.year:
-                timetable = ensure_timetable(now.year)
-                cached_year = now.year
+            # Re-check timetable daily; ensure_timetable will re-fetch if stale (>30d) or missing
+            year_changed = cached_year != now.year
+            timetable = ensure_timetable(now.year)
+            cached_year = now.year
+            if year_changed:
                 prev_file = f"timetable_{now.year - 1}.json"
                 if os.path.exists(prev_file):
                     os.remove(prev_file)
