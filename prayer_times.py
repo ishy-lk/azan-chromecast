@@ -243,7 +243,7 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None, iqamah_time=None):
                 except Exception:
                     pass
             chromecasts, browser = pychromecast.get_listed_chromecasts(
-                friendly_names=list(SPEAKER_OR_GROUP_NAME), discovery_timeout=10)
+                friendly_names=list(SPEAKER_OR_GROUP_NAME), discovery_timeout=20)
             if chromecasts:
                 break
             log_warn("playback_discovery_retry", attempt=attempt,
