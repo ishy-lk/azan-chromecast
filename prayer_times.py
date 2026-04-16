@@ -236,6 +236,7 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None, iqamah_time=None):
         log_info("playback_start", prayer=prayer_name, test=test_mode)
 
         chromecasts, browser = None, None
+        discovery_start = time.time()
         for attempt in range(1, 4):
             if browser is not None:
                 try:
@@ -248,12 +249,15 @@ def play_azan(is_fajr, test_mode=False, prayer_name=None, iqamah_time=None):
                 break
             log_warn("playback_discovery_retry", attempt=attempt,
                      targets=list(SPEAKER_OR_GROUP_NAME))
+        discovery_elapsed = round(time.time() - discovery_start, 2)
         if not chromecasts:
-            log_error("playback_no_devices", targets=list(SPEAKER_OR_GROUP_NAME))
+            log_error("playback_no_devices", targets=list(SPEAKER_OR_GROUP_NAME),
+                      elapsed_seconds=discovery_elapsed)
             return
 
         log_info("playback_devices_found", count=len(chromecasts),
-                 devices=[c.name for c in chromecasts])
+                 devices=[c.name for c in chromecasts],
+                 attempts=attempt, elapsed_seconds=discovery_elapsed)
 
         volume = FAJR_VOLUME if is_fajr else STANDARD_VOLUME
 

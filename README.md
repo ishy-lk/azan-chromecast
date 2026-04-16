@@ -386,6 +386,7 @@ azan-chromecast/
 - Ensure your device and Chromecast are on the same WiFi network
 - Check `speaker_or_group_name` in `config.json` matches your device/group name exactly (case-sensitive)
 - Run `python3 prayer_times.py --json --test` to verify discovery works
+- mDNS discovery can occasionally fail (especially if the Cast group was idle). The service retries up to 3 times with a 20s timeout each (60s total) before giving up. The `playback_devices_found` log line includes `attempts` and `elapsed_seconds` so you can see how long discovery took
 
 ### No audio on some devices in a group
 - The script automatically skips cover art for group casts to prevent audio-only devices (e.g. Nest Mini) from dropping out of sync
