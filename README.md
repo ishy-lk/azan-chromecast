@@ -1,6 +1,10 @@
 # 🕌 Prayer Times Chromecast
 
-Automatically plays the Azan (Islamic call to prayer) on Google Chromecast devices at the correct prayer times. Supports two modes: fetch a full timetable from your masjid's [my-masjid.com](https://my-masjid.com) screen (includes Iqamah times), or calculate from your coordinates.
+Automatically plays the Azan (Islamic call to prayer) on Google Chromecast devices at the correct prayer times.
+
+## AI / Claude Context
+
+This repo includes a `.claude-mem.md` file (gitignored, lives only on your machine) that gives Claude Code instant project context — stack, modes, deploy steps, and conventions — so you don't need to re-explain every session. Start a session by saying: *"refer to `.claude-mem.md` for project context"*. Supports two modes: fetch a full timetable from your masjid's [my-masjid.com](https://my-masjid.com) screen (includes Iqamah times), or calculate from your coordinates.
 
 ## Quick Commands
 
