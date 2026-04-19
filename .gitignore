@@ -30,3 +30,6 @@ Thumbs.db
 
 # Original unoptimized image (keep the optimized one)
 makkah-1-wide.jpeg
+
+# Local AI/agent context
+.claude-mem.md
